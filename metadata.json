@@ -1,0 +1,5 @@
+{
+  "name": "DocuMind - AI Study Companion",
+  "description": "Upload documents to generate topic-based quizzes with performance analysis or chat with your document using an advanced AI assistant.",
+  "requestFramePermissions": []
+}
