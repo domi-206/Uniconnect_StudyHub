@@ -56,7 +56,7 @@ const App: React.FC = () => {
     }
   };
 
-  // Simulate progress for quiz generation - OPTIMIZED: Faster update interval
+  // Simulate progress for quiz generation
   useEffect(() => {
     let interval: any;
     if (isLoading && loadingType === 'quiz') {
@@ -65,8 +65,8 @@ const App: React.FC = () => {
       setLoadingStage("Initializing AI...");
       
       interval = setInterval(() => {
-        p += Math.random() * 15; // Much Faster increment
-        if (p > 95) p = 95; // Cap at 95% until done
+        p += Math.random() * 15; 
+        if (p > 95) p = 95; 
         
         setLoadingProgress(p);
 
@@ -146,7 +146,7 @@ const App: React.FC = () => {
 
   if (isCheckingKey) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-slate-50">
+      <div className="h-[100dvh] w-full flex items-center justify-center bg-slate-50">
         <Loader2 className="w-8 h-8 animate-spin text-[#07bc0c]" />
       </div>
     );
@@ -154,7 +154,7 @@ const App: React.FC = () => {
 
   if (!hasApiKey) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 p-6">
+      <div className="h-[100dvh] w-full flex flex-col items-center justify-center bg-slate-50 p-6">
         <div className="max-w-md w-full bg-white p-10 rounded-3xl shadow-xl text-center border border-slate-100">
           <div className="w-20 h-20 bg-[#07bc0c]/10 rounded-full flex items-center justify-center mx-auto mb-6 relative">
             <Brain className="w-10 h-10 text-[#07bc0c]" />
@@ -193,68 +193,72 @@ const App: React.FC = () => {
   }
 
   const Dashboard = () => (
-    <div className="flex flex-col items-center justify-center h-full space-y-8 p-6 animate-fade-in bg-slate-50 relative overflow-hidden">
-      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-[#07bc0c]/5 rounded-full blur-3xl pointer-events-none"></div>
+    <div className="h-full w-full overflow-y-auto bg-slate-50 relative p-4 md:p-6">
+      <div className="absolute top-0 left-0 w-full h-[500px] bg-[#07bc0c]/5 rounded-b-[100%] pointer-events-none -z-0"></div>
 
       {/* Top Bar for Navigation */}
-      <div className="absolute top-6 left-6 z-20">
+      <div className="relative z-20 flex justify-between items-center mb-8">
           <button 
             onClick={() => { setFile(null); setMode(AppMode.UPLOAD); }}
-            className="flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm text-slate-500 hover:text-red-500 hover:bg-red-50 transition-colors border border-slate-200 text-sm font-bold"
+            className="flex items-center gap-2 bg-white px-3 py-2 md:px-4 md:py-2 rounded-full shadow-sm text-slate-500 hover:text-red-500 hover:bg-red-50 transition-colors border border-slate-200 text-xs md:text-sm font-bold"
             title="Delete PDF and go back"
           >
             <ArrowLeft className="w-4 h-4" />
-            <Trash2 className="w-4 h-4" />
-            <span className="hidden md:inline">Delete PDF & Go Back</span>
+            <span className="md:inline">Delete PDF</span>
           </button>
       </div>
 
-      <div className="text-center relative z-10">
-        <h1 className="text-4xl font-bold text-slate-800 mb-3">Choose Your Path</h1>
-        <p className="text-slate-500 text-lg bg-white/50 backdrop-blur-sm px-4 py-1 rounded-full inline-block border border-slate-200">
-            Document: <span className="font-semibold text-[#07bc0c]">{file?.name}</span>
-        </p>
-      </div>
+      <div className="flex flex-col items-center justify-center min-h-[calc(100%-80px)] pb-10">
+        <div className="text-center relative z-10 max-w-2xl mb-12">
+            <h1 className="text-3xl md:text-5xl font-bold text-slate-800 mb-4 tracking-tight">Choose Your Path</h1>
+            <div className="inline-flex items-center gap-2 bg-white px-5 py-2 rounded-full shadow-sm border border-slate-100">
+                <FileQuestion className="w-4 h-4 text-[#07bc0c]" />
+                <p className="text-slate-500 text-sm md:text-base truncate max-w-[200px] md:max-w-md">
+                    <span className="font-semibold text-slate-800">{file?.name}</span>
+                </p>
+            </div>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl relative z-10">
-        <button 
-          onClick={() => setMode(AppMode.QUIZ_CONFIG)}
-          className="group relative bg-white p-10 rounded-3xl shadow-sm border border-slate-100 hover:border-[#07bc0c] hover:shadow-xl hover:shadow-[#07bc0c]/10 transition-all duration-300 flex flex-col items-center text-center transform hover:-translate-y-2"
-        >
-           <div className="absolute top-0 left-0 w-full h-2 bg-[#07bc0c] rounded-t-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-           <div className="bg-[#07bc0c]/10 p-6 rounded-full text-[#07bc0c] mb-6 group-hover:scale-110 transition-transform duration-300 shadow-sm">
-              <BookOpen className="w-10 h-10" />
-           </div>
-           <h3 className="text-2xl font-bold text-slate-800 mb-3">Generate Quiz</h3>
-           <p className="text-slate-500">Master your document topic by topic with AI-generated questions and detailed performance analysis.</p>
-        </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 w-full max-w-4xl relative z-10 px-2 md:px-0">
+            <button 
+            onClick={() => setMode(AppMode.QUIZ_CONFIG)}
+            className="group relative bg-white p-8 md:p-10 rounded-3xl shadow-sm border border-slate-100 hover:border-[#07bc0c] hover:shadow-xl hover:shadow-[#07bc0c]/10 transition-all duration-300 flex flex-col items-center text-center transform hover:-translate-y-2"
+            >
+            <div className="absolute top-0 left-0 w-full h-2 bg-[#07bc0c] rounded-t-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="bg-[#07bc0c]/10 p-5 md:p-6 rounded-full text-[#07bc0c] mb-6 group-hover:scale-110 transition-transform duration-300 shadow-sm">
+                <BookOpen className="w-8 h-8 md:w-10 md:h-10" />
+            </div>
+            <h3 className="text-xl md:text-2xl font-bold text-slate-800 mb-3">Generate Quiz</h3>
+            <p className="text-sm md:text-base text-slate-500 leading-relaxed">Master your document topic by topic with AI-generated questions and detailed performance analysis.</p>
+            </button>
 
-        <button 
-          onClick={() => setMode(AppMode.CHAT)}
-          className="group relative bg-white p-10 rounded-3xl shadow-sm border border-slate-100 hover:border-[#07bc0c] hover:shadow-xl hover:shadow-[#07bc0c]/10 transition-all duration-300 flex flex-col items-center text-center transform hover:-translate-y-2"
-        >
-           <div className="absolute top-0 left-0 w-full h-2 bg-[#07bc0c] rounded-t-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-           <div className="bg-[#07bc0c]/10 p-6 rounded-full text-[#07bc0c] mb-6 group-hover:scale-110 transition-transform duration-300 shadow-sm">
-              <MessageCircle className="w-10 h-10" />
-           </div>
-           <h3 className="text-2xl font-bold text-slate-800 mb-3">Ask AI Assistant</h3>
-           <p className="text-slate-500">Chat interactively with your document to clear doubts, summarize sections, and extract insights.</p>
-        </button>
+            <button 
+            onClick={() => setMode(AppMode.CHAT)}
+            className="group relative bg-white p-8 md:p-10 rounded-3xl shadow-sm border border-slate-100 hover:border-[#07bc0c] hover:shadow-xl hover:shadow-[#07bc0c]/10 transition-all duration-300 flex flex-col items-center text-center transform hover:-translate-y-2"
+            >
+            <div className="absolute top-0 left-0 w-full h-2 bg-[#07bc0c] rounded-t-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="bg-[#07bc0c]/10 p-5 md:p-6 rounded-full text-[#07bc0c] mb-6 group-hover:scale-110 transition-transform duration-300 shadow-sm">
+                <MessageCircle className="w-8 h-8 md:w-10 md:h-10" />
+            </div>
+            <h3 className="text-xl md:text-2xl font-bold text-slate-800 mb-3">Ask AI Assistant</h3>
+            <p className="text-sm md:text-base text-slate-500 leading-relaxed">Chat interactively with your document to clear doubts, summarize sections, and extract insights.</p>
+            </button>
+        </div>
       </div>
     </div>
   );
 
   if (isLoading) {
       return (
-          <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 relative overflow-hidden">
+          <div className="h-[100dvh] w-full flex flex-col items-center justify-center bg-slate-50 relative overflow-hidden p-6">
               {loadingType === 'upload' ? (
-                <div className="flex flex-col items-center relative z-10">
-                    <div className="w-24 h-24 border-4 border-[#07bc0c]/20 border-t-[#07bc0c] rounded-full animate-spin mb-8 shadow-2xl shadow-[#07bc0c]/20"></div>
-                     <h2 className="text-2xl font-bold text-slate-800 animate-pulse relative z-10">{loadingText}</h2>
+                <div className="flex flex-col items-center relative z-10 text-center">
+                    <div className="w-20 h-20 md:w-24 md:h-24 border-4 border-[#07bc0c]/20 border-t-[#07bc0c] rounded-full animate-spin mb-8 shadow-2xl shadow-[#07bc0c]/20"></div>
+                     <h2 className="text-xl md:text-2xl font-bold text-slate-800 animate-pulse relative z-10">{loadingText}</h2>
                      <p className="text-slate-400 mt-2 relative z-10">Scanning content...</p>
                 </div>
               ) : (
-                <div className="flex flex-col items-center relative z-10 w-full max-w-md px-6">
+                <div className="flex flex-col items-center relative z-10 w-full max-w-md px-6 text-center">
                     <div className="relative mb-12">
                         <div className="absolute inset-0 animate-spin" style={{ animationDuration: '3s' }}>
                             <div className="absolute -top-4 left-1/2 w-4 h-4 bg-[#07bc0c] rounded-full blur-sm"></div>
@@ -269,8 +273,8 @@ const App: React.FC = () => {
                         </div>
                     </div>
                     
-                    <h2 className="text-2xl font-bold text-slate-800 mb-2">{loadingStage}</h2>
-                    <p className="text-slate-400 mb-8 text-sm font-medium uppercase tracking-wide">
+                    <h2 className="text-xl md:text-2xl font-bold text-slate-800 mb-2">{loadingStage}</h2>
+                    <p className="text-slate-400 mb-8 text-xs md:text-sm font-medium uppercase tracking-wide">
                         {loadingText}
                     </p>
 
@@ -289,7 +293,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="h-screen w-full bg-slate-50">
+    <div className="h-[100dvh] w-full bg-slate-50 overflow-hidden">
       {mode === AppMode.UPLOAD && <FileUpload onFileUpload={handleFileUpload} />}
       {mode === AppMode.DASHBOARD && <Dashboard />}
       {mode === AppMode.QUIZ_CONFIG && (

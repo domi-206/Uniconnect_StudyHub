@@ -36,8 +36,7 @@ const QuizGame: React.FC<QuizGameProps> = ({ questions, settings, onFinish }) =>
 
     if (currentIndex < questions.length - 1) {
       setCurrentIndex(prev => prev + 1);
-      // Reset question timer only if visiting for the first time or logic dictates
-      // For this app, we simply reset the timer for the new question to guide pacing
+      // Reset question timer
       setTimeLeft(settings.timePerQuestion);
     } else {
       // Last question - Submit
@@ -48,8 +47,6 @@ const QuizGame: React.FC<QuizGameProps> = ({ questions, settings, onFinish }) =>
   const handlePrevious = useCallback(() => {
       if (currentIndex > 0) {
           setCurrentIndex(prev => prev - 1);
-          // When going back, we don't necessarily reset the timer to full, 
-          // but for simplicity in this UI, we give them the standard time for that slide.
           setTimeLeft(settings.timePerQuestion);
       }
   }, [currentIndex, settings.timePerQuestion]);
@@ -59,9 +56,6 @@ const QuizGame: React.FC<QuizGameProps> = ({ questions, settings, onFinish }) =>
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
-          // Time for this question runs out
-          // We can auto-advance or just stop. 
-          // Let's auto-advance to keep momentum.
           clearInterval(timer);
           handleNext();
           return 0;
@@ -93,22 +87,22 @@ const QuizGame: React.FC<QuizGameProps> = ({ questions, settings, onFinish }) =>
   const timerProgress = (timeLeft / settings.timePerQuestion) * 100;
 
   return (
-    <div className="max-w-4xl mx-auto p-4 md:p-6 h-full flex flex-col bg-slate-50 overflow-hidden">
+    <div className="max-w-4xl mx-auto h-full flex flex-col bg-slate-50 overflow-hidden relative">
       {/* Header */}
-      <div className="shrink-0 mb-6">
-        <div className="flex justify-between items-end mb-4">
+      <div className="shrink-0 pt-4 px-4 md:px-6 mb-2 md:mb-6">
+        <div className="flex justify-between items-end mb-3 md:mb-4">
           <div className="flex flex-col">
-            <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Question</span>
-            <span className="text-slate-800 font-bold text-xl">{currentIndex + 1} <span className="text-slate-400 text-lg font-medium">/ {questions.length}</span></span>
+            <span className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">Question</span>
+            <span className="text-slate-800 font-bold text-lg md:text-xl">{currentIndex + 1} <span className="text-slate-400 text-base md:text-lg font-medium">/ {questions.length}</span></span>
           </div>
-          <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border border-slate-200">
-            <Timer className={`w-5 h-5 ${timeLeft < 10 ? 'text-red-500' : 'text-[#07bc0c]'}`} />
-            <span className={`font-mono font-bold text-xl ${timeLeft < 10 ? 'text-red-500' : 'text-slate-700'}`}>{timeLeft}s</span>
+          <div className="flex items-center gap-2 bg-white px-3 py-1.5 md:px-4 md:py-2 rounded-full shadow-sm border border-slate-200">
+            <Timer className={`w-4 h-4 md:w-5 md:h-5 ${timeLeft < 10 ? 'text-red-500' : 'text-[#07bc0c]'}`} />
+            <span className={`font-mono font-bold text-lg md:text-xl ${timeLeft < 10 ? 'text-red-500' : 'text-slate-700'}`}>{timeLeft}s</span>
           </div>
         </div>
         
         {/* Progress Bar */}
-        <div className="w-full bg-slate-200 h-3 rounded-full overflow-hidden relative">
+        <div className="w-full bg-slate-200 h-2 md:h-3 rounded-full overflow-hidden relative">
           <div 
             className="bg-[#07bc0c] h-full transition-all duration-500 ease-out shadow-[0_0_10px_#07bc0c]" 
             style={{ width: `${progress}%` }}
@@ -122,13 +116,13 @@ const QuizGame: React.FC<QuizGameProps> = ({ questions, settings, onFinish }) =>
       </div>
 
       {/* Question Card - Scrollable Container */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-1 pb-2 custom-scrollbar">
-        <div key={currentIndex} className="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 p-6 md:p-10 border border-slate-100 min-h-full flex flex-col justify-center animate-fade-in-up">
-            <h2 className="text-2xl md:text-3xl font-bold text-slate-800 mb-8 leading-snug">
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2 md:px-6 custom-scrollbar">
+        <div key={currentIndex} className="bg-white rounded-2xl md:rounded-[2rem] shadow-xl shadow-slate-200/50 p-5 md:p-10 border border-slate-100 min-h-full flex flex-col justify-center animate-fade-in-up">
+            <h2 className="text-xl md:text-3xl font-bold text-slate-800 mb-6 md:mb-8 leading-snug">
             {currentQuestion.text}
             </h2>
 
-            <div className="space-y-4">
+            <div className="space-y-3 md:space-y-4 pb-4">
             {currentQuestion.options.map((option, idx) => {
                 const isSelected = answers[currentIndex] === idx;
                 
@@ -142,17 +136,17 @@ const QuizGame: React.FC<QuizGameProps> = ({ questions, settings, onFinish }) =>
                 <button
                     key={idx}
                     onClick={() => handleSelectOption(idx)}
-                    className={`w-full text-left p-5 md:p-6 rounded-2xl border-2 transition-all duration-200 flex items-center justify-between group ${cardClass}`}
+                    className={`w-full text-left p-4 md:p-6 rounded-xl md:rounded-2xl border-2 transition-all duration-200 flex items-center justify-between group ${cardClass}`}
                 >
-                    <div className="flex items-center gap-5">
-                        <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border ${
+                    <div className="flex items-center gap-3 md:gap-5">
+                        <span className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm font-bold border shrink-0 ${
                             isSelected ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200'
                         }`}>
                             {String.fromCharCode(65 + idx)}
                         </span>
-                        <span className={`font-semibold text-lg ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{option}</span>
+                        <span className={`font-semibold text-base md:text-lg ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{option}</span>
                     </div>
-                    {isSelected && <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center"><div className="w-2 h-2 bg-white rounded-full"></div></div>}
+                    {isSelected && <div className="w-4 h-4 md:w-5 md:h-5 rounded-full bg-indigo-600 flex items-center justify-center shrink-0"><div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-white rounded-full"></div></div>}
                 </button>
                 );
             })}
@@ -160,31 +154,31 @@ const QuizGame: React.FC<QuizGameProps> = ({ questions, settings, onFinish }) =>
         </div>
       </div>
 
-      {/* Footer Controls */}
-      <div className="shrink-0 flex justify-between items-center h-20 md:h-24 pt-4">
+      {/* Footer Controls - Sticky Bottom */}
+      <div className="shrink-0 flex justify-between items-center h-auto py-4 px-4 md:px-6 md:h-24 bg-slate-50 border-t border-slate-100 md:border-0 z-10">
         <button
             onClick={handlePrevious}
             disabled={currentIndex === 0}
-            className={`flex items-center gap-3 px-6 md:px-8 py-3 md:py-4 rounded-full font-bold text-lg transition-all ${
+            className={`flex items-center gap-2 md:gap-3 px-5 py-3 md:px-8 md:py-4 rounded-full font-bold text-sm md:text-lg transition-all ${
                 currentIndex === 0 
                 ? 'opacity-40 cursor-not-allowed bg-slate-100 text-slate-400' 
                 : 'text-slate-600 hover:bg-slate-200 hover:text-slate-900 shadow-sm border border-transparent hover:border-slate-300 bg-white'
             }`}
         >
-            <ArrowLeft className="w-6 h-6" />
-            Previous
+            <ArrowLeft className="w-5 h-5 md:w-6 md:h-6" />
+            <span className="hidden xs:inline">Previous</span>
         </button>
 
         <button
             onClick={handleNext}
-            className={`flex items-center gap-3 px-8 md:px-10 py-3 md:py-4 rounded-full font-bold text-lg transition-all transform hover:scale-105 hover:shadow-xl shadow-lg ${
+            className={`flex items-center gap-2 md:gap-3 px-6 py-3 md:px-10 md:py-4 rounded-full font-bold text-sm md:text-lg transition-all transform hover:scale-105 hover:shadow-xl shadow-lg ${
                 currentIndex === questions.length - 1
                 ? 'bg-[#07bc0c] text-white hover:bg-[#06a00a]' // Green for Submit
                 : 'bg-slate-900 text-white hover:bg-slate-800' // Dark for Next
             }`}
         >
-            {currentIndex === questions.length - 1 ? "Submit Quiz" : "Next Question"}
-            <ArrowRight className="w-6 h-6" />
+            {currentIndex === questions.length - 1 ? "Submit" : "Next"}
+            <ArrowRight className="w-5 h-5 md:w-6 md:h-6" />
         </button>
       </div>
     </div>

@@ -178,18 +178,18 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack }) => {
   return (
     <div className="flex flex-col h-full bg-white relative">
       {/* Header */}
-      <div className="h-16 border-b border-slate-100 flex items-center justify-between px-6 bg-white/90 backdrop-blur-md z-10 sticky top-0">
-        <button onClick={onBack} className="text-slate-500 hover:text-slate-800 font-medium transition-colors">
-          &larr; Exit Chat
+      <div className="h-14 md:h-16 border-b border-slate-100 flex items-center justify-between px-4 md:px-6 bg-white/90 backdrop-blur-md z-10 sticky top-0 shrink-0">
+        <button onClick={onBack} className="text-slate-500 hover:text-slate-800 font-medium transition-colors text-sm md:text-base flex items-center gap-1">
+          &larr; <span className="hidden xs:inline">Exit</span>
         </button>
         <div className="flex items-center gap-2">
-            <div className="bg-[#07bc0c]/10 p-2 rounded-full">
-                <Sparkles className="w-5 h-5 text-[#07bc0c]" />
+            <div className="bg-[#07bc0c]/10 p-1.5 md:p-2 rounded-full">
+                <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-[#07bc0c]" />
             </div>
-            <h2 className="font-bold text-slate-800">
+            <h2 className="font-bold text-slate-800 text-sm md:text-base truncate max-w-[150px] md:max-w-none">
                 AI Assistant 
-                {isConnecting && <span className="text-xs font-normal text-slate-400 ml-2">(Connecting...)</span>}
-                {connectionError && <span className="text-xs font-bold text-red-500 ml-2">(Connection Failed)</span>}
+                {isConnecting && <span className="hidden md:inline text-xs font-normal text-slate-400 ml-2">(Connecting...)</span>}
+                {connectionError && <span className="hidden md:inline text-xs font-bold text-red-500 ml-2">(Connection Failed)</span>}
             </h2>
         </div>
         <button 
@@ -197,12 +197,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack }) => {
             className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-red-500 transition-colors"
             title="Restart Chat"
         >
-            <Trash2 className="w-5 h-5" />
+            <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
         </button>
       </div>
 
       {/* Messages Area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-8 bg-slate-50/50">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 md:p-6 space-y-6 md:space-y-8 bg-slate-50/50 pb-4">
         {connectionError ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-400">
                 <AlertCircle className="w-12 h-12 mb-2 text-red-400" />
@@ -229,10 +229,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack }) => {
 
                     return (
                     <div key={msg.id} className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
-                        <div className={`flex max-w-[85%] md:max-w-[70%] gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                        <div className={`flex max-w-[95%] md:max-w-[70%] gap-2 md:gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                         
                         {/* Avatar */}
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-sm ${msg.role === 'user' ? 'bg-[#07bc0c]' : 'bg-white border border-slate-200'}`}>
+                        <div className={`hidden md:flex w-10 h-10 rounded-full items-center justify-center shrink-0 shadow-sm ${msg.role === 'user' ? 'bg-[#07bc0c]' : 'bg-white border border-slate-200'}`}>
                             {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <Bot className="w-5 h-5 text-[#07bc0c]" />}
                         </div>
 
@@ -244,7 +244,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack }) => {
                                     Replying to: {replyContext.substring(0, 20)}...
                                 </div>
                             )}
-                            <div className={`p-5 rounded-3xl shadow-sm text-sm md:text-base leading-relaxed relative ${
+                            <div className={`p-4 md:p-5 rounded-2xl md:rounded-3xl shadow-sm text-sm md:text-base leading-relaxed relative ${
                             msg.role === 'user' 
                                 ? 'bg-[#07bc0c] text-white rounded-tr-none' 
                                 : 'bg-white text-slate-700 border border-slate-200 rounded-tl-none'
@@ -252,20 +252,20 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack }) => {
                             <FormattedText text={displayText} />
                             </div>
                             
-                            {/* Actions (Hover) */}
-                            <div className={`absolute -bottom-8 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-200 ${msg.role === 'user' ? 'right-0 justify-end' : 'left-0'}`}>
-                            <button onClick={() => handleReply(msg)} className="p-1.5 rounded-full hover:bg-white text-slate-400 hover:text-[#07bc0c] hover:shadow-sm transition-all" title="Reply">
+                            {/* Actions (Hover/Touch) */}
+                            <div className={`flex gap-2 mt-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-all duration-200 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <button onClick={() => handleReply(msg)} className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-[#07bc0c] transition-all" title="Reply">
                                 <Reply className="w-3.5 h-3.5" />
                             </button>
-                            <button onClick={() => handleCopy(msg.text)} className="p-1.5 rounded-full hover:bg-white text-slate-400 hover:text-[#07bc0c] hover:shadow-sm transition-all" title="Copy">
+                            <button onClick={() => handleCopy(msg.text)} className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-[#07bc0c] transition-all" title="Copy">
                                 <Copy className="w-3.5 h-3.5" />
                             </button>
                             {msg.role === 'user' && (
                                 <>
-                                    <button onClick={() => handleEdit(msg.id, msg.text)} className="p-1.5 rounded-full hover:bg-white text-slate-400 hover:text-[#07bc0c] hover:shadow-sm transition-all" title="Edit">
+                                    <button onClick={() => handleEdit(msg.id, msg.text)} className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-[#07bc0c] transition-all" title="Edit">
                                         <Edit2 className="w-3.5 h-3.5" />
                                     </button>
-                                    <button onClick={() => handleDelete(msg.id)} className="p-1.5 rounded-full hover:bg-white text-slate-400 hover:text-red-500 hover:shadow-sm transition-all" title="Delete Message">
+                                    <button onClick={() => handleDelete(msg.id)} className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-red-500 transition-all" title="Delete Message">
                                         <X className="w-3.5 h-3.5" />
                                     </button>
                                 </>
@@ -279,10 +279,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack }) => {
                 {isTyping && (
                 <div className="flex justify-start w-full animate-pulse">
                     <div className="flex gap-4 max-w-[70%]">
-                        <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center shrink-0">
+                        <div className="hidden md:flex w-10 h-10 rounded-full bg-white border border-slate-200 items-center justify-center shrink-0">
                             <Bot className="w-5 h-5 text-[#07bc0c]" />
                         </div>
-                        <div className="bg-white p-5 rounded-3xl rounded-tl-none border border-slate-100 flex items-center gap-1.5">
+                        <div className="bg-white p-4 md:p-5 rounded-3xl rounded-tl-none border border-slate-100 flex items-center gap-1.5">
                             <span className="w-2 h-2 bg-[#07bc0c] rounded-full animate-bounce"></span>
                             <span className="w-2 h-2 bg-[#07bc0c] rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></span>
                             <span className="w-2 h-2 bg-[#07bc0c] rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></span>
@@ -295,15 +295,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack }) => {
       </div>
 
       {/* Input Area */}
-      <div className="p-6 bg-white border-t border-slate-100 relative">
+      <div className="p-3 md:p-6 bg-white border-t border-slate-100 relative shrink-0">
         {/* Reply Preview */}
         {replyTo && (
-            <div className="absolute top-[-3rem] left-6 right-6 bg-white border border-slate-200 shadow-lg rounded-xl p-3 flex items-center justify-between animate-fade-in-up">
+            <div className="absolute top-[-3.5rem] left-2 right-2 md:left-6 md:right-6 bg-white border border-slate-200 shadow-lg rounded-xl p-3 flex items-center justify-between animate-fade-in-up">
                 <div className="flex items-center gap-3 overflow-hidden">
                     <Reply className="w-4 h-4 text-[#07bc0c] shrink-0" />
                     <div className="flex flex-col">
                         <span className="text-xs font-bold text-[#07bc0c]">Replying to {replyTo.role}</span>
-                        <span className="text-xs text-slate-500 truncate max-w-md">{replyTo.text}</span>
+                        <span className="text-xs text-slate-500 truncate max-w-[200px] md:max-w-md">{replyTo.text}</span>
                     </div>
                 </div>
                 <button onClick={() => setReplyTo(null)} className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600">
@@ -313,7 +313,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack }) => {
         )}
 
         <div 
-            className="max-w-4xl mx-auto relative bg-slate-50 rounded-[2rem] flex items-center transition-all border border-slate-200 focus-within:ring-2 focus-within:ring-[#07bc0c]/20 focus-within:border-[#07bc0c] focus-within:bg-white focus-within:shadow-xl shadow-sm"
+            className="max-w-4xl mx-auto relative bg-slate-50 rounded-[1.5rem] md:rounded-[2rem] flex items-center transition-all border border-slate-200 focus-within:ring-2 focus-within:ring-[#07bc0c]/20 focus-within:border-[#07bc0c] focus-within:bg-white focus-within:shadow-xl shadow-sm"
             onClick={() => inputRef.current?.focus()}
         >
           <input
@@ -323,13 +323,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack }) => {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             disabled={isConnecting || connectionError}
-            placeholder={isConnecting ? "Initializing AI chat..." : (connectionError ? "Connection failed" : (replyTo ? "Type your reply..." : "Type your question here..."))}
-            className="w-full bg-transparent px-8 py-5 text-slate-700 placeholder-slate-400 focus:outline-none text-lg disabled:opacity-50"
+            placeholder={isConnecting ? "Initializing..." : (connectionError ? "Failed" : (replyTo ? "Reply..." : "Type a message..."))}
+            className="w-full bg-transparent px-4 py-3 md:px-8 md:py-5 text-slate-700 placeholder-slate-400 focus:outline-none text-base md:text-lg disabled:opacity-50"
           />
           <button
             onClick={handleSend}
             disabled={!inputValue.trim() || isConnecting || connectionError}
-            className={`mr-3 p-3 rounded-full transition-all duration-300 group overflow-hidden relative w-12 h-12 flex items-center justify-center ${
+            className={`mr-2 md:mr-3 p-2 md:p-3 rounded-full transition-all duration-300 group overflow-hidden relative w-10 h-10 md:w-12 md:h-12 flex items-center justify-center ${
                 inputValue.trim() && !isConnecting && !connectionError
                 ? 'bg-[#07bc0c] text-white shadow-lg hover:shadow-[#07bc0c]/40 hover:scale-105 active:scale-95' 
                 : 'bg-slate-200 text-slate-400 cursor-not-allowed'
@@ -337,9 +337,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack }) => {
           >
              <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ${isSending ? 'opacity-0 translate-y-[-200%]' : 'opacity-100'}`}>
                 {isConnecting ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
                 ) : (
-                    <Rocket className={`w-6 h-6 transform transition-transform group-hover:-rotate-45 ${inputValue.trim() ? 'animate-pulse' : ''}`} />
+                    <Rocket className={`w-5 h-5 md:w-6 md:h-6 transform transition-transform group-hover:-rotate-45 ${inputValue.trim() ? 'animate-pulse' : ''}`} />
                 )}
              </div>
              <div className={`absolute inset-0 bg-white/20 transition-all duration-300 rounded-full ${isSending ? 'scale-150 opacity-0' : 'scale-0 opacity-100'}`}></div>
