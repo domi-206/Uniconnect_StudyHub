@@ -16,9 +16,14 @@ const QuizConfig: React.FC<QuizConfigProps> = ({ topics, onStart, onBack }) => {
     totalTimeLimit: 0
   });
 
-  // Ensure first unlockable topic is selected if current is locked (edge case)
+  // Ensure an unlocked topic is selected if the current selection is locked or invalid
   React.useEffect(() => {
-    if (!selectedTopic && topics.length > 0) setSelectedTopic(topics[0].name);
+    const availableTopic = topics.find(t => !t.isLocked);
+    const currentIsLocked = topics.find(t => t.name === selectedTopic)?.isLocked;
+    
+    if ((!selectedTopic || currentIsLocked) && availableTopic) {
+        setSelectedTopic(availableTopic.name);
+    }
   }, [topics, selectedTopic]);
 
   const handleStart = () => {
@@ -161,13 +166,13 @@ const QuizConfig: React.FC<QuizConfigProps> = ({ topics, onStart, onBack }) => {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 w-full bg-white/80 backdrop-blur-md border-t border-slate-200 p-4 md:p-6 z-10 flex justify-center">
+      <div className="fixed bottom-0 left-0 w-full bg-white/80 backdrop-blur-md border-t border-slate-200 p-4 md:p-6 z-10 flex justify-center pb-12">
         <button
           onClick={handleStart}
           disabled={!selectedTopic || (currentTopicStatus?.isLocked || false)}
           className={`
             flex items-center gap-3 px-8 md:px-10 py-3 md:py-4 rounded-full text-lg md:text-xl font-bold shadow-xl transition-all transform hover:scale-105 active:scale-95
-            ${!selectedTopic || (currentTopicStatus?.isLocked) 
+            ${(!selectedTopic || currentTopicStatus?.isLocked) 
                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
                 : 'bg-[#07bc0c] text-white hover:bg-[#06a00a] hover:shadow-[#07bc0c]/40'}
           `}

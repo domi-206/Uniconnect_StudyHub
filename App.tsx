@@ -87,9 +87,10 @@ const App: React.FC = () => {
     
     try {
       const topicList = await analyzeTopics(uploadedFile);
-      setTopics(topicList.map((t, i) => ({ 
+      // All topics are initially unlocked so user can choose any
+      setTopics(topicList.map((t) => ({ 
         name: t, 
-        isLocked: i !== 0,
+        isLocked: false,
         bestScore: undefined 
       })));
       setMode(AppMode.DASHBOARD);
@@ -134,10 +135,21 @@ const App: React.FC = () => {
           
           if (currentIdx !== -1) {
              const prevScore = newTopics[currentIdx].bestScore || 0;
-             newTopics[currentIdx].bestScore = Math.max(prevScore, score);
+             const newBestScore = Math.max(prevScore, score);
+             newTopics[currentIdx].bestScore = newBestScore;
 
-             if (score >= 70 && currentIdx < newTopics.length - 1) {
-                 newTopics[currentIdx + 1].isLocked = false;
+             // Logic: User can choose any topic initially.
+             // But if they fail a topic (bestScore < 70), they are locked into it until they pass.
+             const isPassed = newBestScore >= 70;
+
+             if (isPassed) {
+                 // If passed, unlock all topics
+                 newTopics.forEach(t => t.isLocked = false);
+             } else {
+                 // If failed, lock all other topics so they focus on this one
+                 newTopics.forEach((t, i) => {
+                     t.isLocked = i !== currentIdx;
+                 });
              }
           }
           return newTopics;
@@ -245,87 +257,6 @@ const App: React.FC = () => {
             </button>
         </div>
       </div>
-    </div>
-  );
-
-  if (isLoading) {
-      return (
-          <div className="h-[100dvh] w-full flex flex-col items-center justify-center bg-slate-50 relative overflow-hidden p-6">
-              {loadingType === 'upload' ? (
-                <div className="flex flex-col items-center relative z-10 text-center">
-                    <div className="w-20 h-20 md:w-24 md:h-24 border-4 border-[#07bc0c]/20 border-t-[#07bc0c] rounded-full animate-spin mb-8 shadow-2xl shadow-[#07bc0c]/20"></div>
-                     <h2 className="text-xl md:text-2xl font-bold text-slate-800 animate-pulse relative z-10">{loadingText}</h2>
-                     <p className="text-slate-400 mt-2 relative z-10">Scanning content...</p>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center relative z-10 w-full max-w-md px-6 text-center">
-                    <div className="relative mb-12">
-                        <div className="absolute inset-0 animate-spin" style={{ animationDuration: '3s' }}>
-                            <div className="absolute -top-4 left-1/2 w-4 h-4 bg-[#07bc0c] rounded-full blur-sm"></div>
-                        </div>
-                         <div className="absolute inset-0 animate-spin" style={{ animationDuration: '5s', animationDirection: 'reverse' }}>
-                            <div className="absolute -bottom-6 left-1/2 w-3 h-3 bg-[#07bc0c]/50 rounded-full blur-sm"></div>
-                        </div>
-                        <div className="absolute -top-12 -left-16 text-[#07bc0c] animate-float opacity-40"><Brain className="w-8 h-8" /></div>
-                        <div className="absolute top-8 -right-20 text-[#07bc0c] animate-float opacity-40" style={{animationDelay: '1.5s'}}><FileQuestion className="w-8 h-8" /></div>
-                        <div className="bg-white p-8 rounded-full shadow-2xl relative z-10 animate-brain-pulse flex items-center justify-center border-4 border-[#07bc0c]/10">
-                            <BookOpen className="w-16 h-16 text-[#07bc0c]" />
-                        </div>
-                    </div>
-                    
-                    <h2 className="text-xl md:text-2xl font-bold text-slate-800 mb-2">{loadingStage}</h2>
-                    <p className="text-slate-400 mb-8 text-xs md:text-sm font-medium uppercase tracking-wide">
-                        {loadingText}
-                    </p>
-
-                    <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden relative">
-                         <div 
-                            className="h-full bg-[#07bc0c] rounded-full transition-all duration-300 ease-out relative overflow-hidden"
-                            style={{ width: `${loadingProgress}%` }}
-                         >
-                            <div className="absolute top-0 left-0 w-full h-full bg-white/20 animate-pulse"></div>
-                         </div>
-                    </div>
-                </div>
-              )}
-          </div>
-      );
-  }
-
-  return (
-    <div className="h-[100dvh] w-full bg-slate-50 overflow-hidden">
-      {mode === AppMode.UPLOAD && <FileUpload onFileUpload={handleFileUpload} />}
-      {mode === AppMode.DASHBOARD && <Dashboard />}
-      {mode === AppMode.QUIZ_CONFIG && (
-        <QuizConfig 
-            topics={topics} 
-            onStart={handleStartQuizGen} 
-            onBack={() => setMode(AppMode.DASHBOARD)} 
-        />
-      )}
-      {mode === AppMode.QUIZ_PLAY && quizSettings && (
-        <QuizGame 
-            questions={currentQuestions} 
-            settings={quizSettings}
-            onFinish={handleQuizFinish} 
-        />
-      )}
-      {mode === AppMode.QUIZ_REVIEW && file && (
-        <QuizReview 
-            questions={currentQuestions}
-            results={quizResults}
-            topic={currentQuizTopic}
-            file={file}
-            onRetry={() => {
-                setMode(AppMode.QUIZ_PLAY);
-            }}
-            onExit={() => setMode(AppMode.DASHBOARD)}
-            onUnlockNext={handleUnlockNext}
-        />
-      )}
-      {mode === AppMode.CHAT && file && (
-        <ChatInterface file={file} onBack={() => setMode(AppMode.DASHBOARD)} />
-      )}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle, XCircle, RotateCcw, ArrowRight, TrendingUp, AlertTriangle, Target, Star } from 'lucide-react';
+import { CheckCircle, XCircle, RotateCcw, ArrowRight, TrendingUp, AlertTriangle, Target, Star, Info, Eye, BrainCircuit } from 'lucide-react';
 import { QuizQuestion, QuizResult, UploadedFile } from '../../types';
 import { getQuizFeedback, FeedbackResult } from '../../services/geminiService';
 
@@ -87,6 +87,18 @@ const QuizReview: React.FC<QuizReviewProps> = ({
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-6 h-full flex flex-col overflow-hidden bg-slate-50">
+      {/* Instructional Banner */}
+      <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl mb-4 flex items-start gap-3 shrink-0 animate-fade-in">
+          <Info className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+          <div className="text-sm text-blue-700">
+             <span className="font-bold block mb-1">Quiz Completed! Here is what to do next:</span>
+             <ul className="list-disc list-inside mt-1 space-y-1 text-blue-600">
+                 <li>Review the <strong>AI Analysis</strong> tab below to understand your strengths and weaknesses (please wait for it to load).</li>
+                 <li>Switch to the <strong>Check Answers</strong> tab to see the correct solutions for every question.</li>
+             </ul>
+          </div>
+      </div>
+
       {/* Score Header */}
       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 mb-6 shrink-0 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
         <div className={`absolute top-0 left-0 w-2 h-full ${passed ? 'bg-[#07bc0c]' : 'bg-amber-500'}`}></div>
@@ -124,21 +136,23 @@ const QuizReview: React.FC<QuizReviewProps> = ({
              <div>
                 <h2 className="text-3xl font-bold text-slate-800 mb-1">{passed ? "Topic Mastered!" : "Keep Practicing"}</h2>
                 <p className="text-slate-500">You answered <strong className={passed ? "text-[#07bc0c]" : "text-amber-500"}>{correctCount}</strong> out of {questions.length} questions correctly.</p>
-                {!passed && <p className="text-sm text-red-500 font-bold mt-2 flex items-center gap-1"><AlertTriangle className="w-4 h-4" /> Score 70% to unlock the next topic.</p>}
+                {!passed && <p className="text-sm text-red-500 font-bold mt-2 flex items-center gap-1"><AlertTriangle className="w-4 h-4" /> Score 70% to unlock other topics.</p>}
              </div>
         </div>
 
-        <div className="flex gap-3 z-10">
+        <div className="flex gap-3 z-10 w-full md:w-auto">
              <button 
                 onClick={() => setActiveTab('overview')}
-                className={`px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'overview' ? 'bg-[#07bc0c] text-white shadow-lg shadow-[#07bc0c]/30' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'overview' ? 'bg-[#07bc0c] text-white shadow-lg shadow-[#07bc0c]/30' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
              >
+                <BrainCircuit className="w-4 h-4" />
                 AI Analysis
              </button>
              <button 
                 onClick={() => setActiveTab('review')}
-                className={`px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'review' ? 'bg-[#07bc0c] text-white shadow-lg shadow-[#07bc0c]/30' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'review' ? 'bg-[#07bc0c] text-white shadow-lg shadow-[#07bc0c]/30' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
              >
+                <Eye className="w-4 h-4" />
                 Check Answers
              </button>
         </div>
@@ -149,9 +163,12 @@ const QuizReview: React.FC<QuizReviewProps> = ({
         {activeTab === 'overview' ? (
           <div className="animate-fade-in-up space-y-6 pb-6">
              {isLoadingFeedback ? (
-                 <div className="flex flex-col items-center justify-center h-64">
-                     <div className="w-16 h-16 border-4 border-[#07bc0c]/20 border-t-[#07bc0c] rounded-full animate-spin mb-4"></div>
-                     <p className="text-slate-500 font-medium animate-pulse">Analyzing performance & generating feedback...</p>
+                 <div className="flex flex-col items-center justify-center h-64 text-center p-6">
+                     <div className="w-16 h-16 border-4 border-[#07bc0c]/20 border-t-[#07bc0c] rounded-full animate-spin mb-6"></div>
+                     <h3 className="text-xl font-bold text-slate-800 mb-2">Generating Performance Analysis</h3>
+                     <p className="text-slate-500 font-medium max-w-md leading-relaxed animate-pulse">
+                        Please be patient. The AI is currently analyzing your quiz responses to detail your strengths, weaknesses, and areas for improvement.
+                     </p>
                  </div>
              ) : (
                 <>

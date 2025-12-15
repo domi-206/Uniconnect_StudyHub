@@ -67,10 +67,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
       </div>
 
       <div
-        className={`w-full max-w-xl h-80 rounded-3xl flex flex-col items-center justify-center cursor-pointer transition-all duration-500 relative overflow-hidden group ${
+        className={`w-full max-w-xl h-80 rounded-3xl flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden group ${
           isDragging
             ? 'border-2 border-[#07bc0c] bg-[#07bc0c]/5 scale-105'
-            : 'border-2 border-dashed border-slate-300 hover:border-[#07bc0c] hover:bg-white hover:shadow-2xl hover:shadow-[#07bc0c]/20'
+            : 'border-2 border-dashed border-slate-300 hover:border-[#07bc0c] hover:bg-white hover:shadow-2xl hover:shadow-[#07bc0c]/20 cursor-pointer'
         }`}
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
