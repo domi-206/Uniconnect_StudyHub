@@ -6,7 +6,7 @@ import QuizGame from './components/Quiz/QuizGame';
 import QuizReview from './components/Quiz/QuizReview';
 import ChatInterface from './components/Chat/ChatInterface';
 import { analyzeTopics, generateQuiz } from './services/geminiService';
-import { BookOpen, MessageCircle, HelpCircle, FileQuestion, Brain, Loader2, Key, Trash2, ArrowLeft } from 'lucide-react';
+import { BookOpen, MessageCircle, HelpCircle, FileQuestion, Brain, Loader2, Key, ArrowLeft, Lightbulb } from 'lucide-react';
 
 const App: React.FC = () => {
   const [file, setFile] = useState<UploadedFile | null>(null);
@@ -15,6 +15,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingText, setLoadingText] = useState('');
   const [loadingType, setLoadingType] = useState<'upload' | 'quiz'>('upload');
+  const [loadingTip, setLoadingTip] = useState('');
   
   // API Key State
   const [hasApiKey, setHasApiKey] = useState(false);
@@ -59,24 +60,45 @@ const App: React.FC = () => {
   // Simulate progress for quiz generation
   useEffect(() => {
     let interval: any;
+    let tipInterval: any;
+
     if (isLoading && loadingType === 'quiz') {
       let p = 0;
       setLoadingProgress(0);
       setLoadingStage("Initializing AI...");
       
+      const tips = [
+        "Analyzing your document for key concepts...",
+        "Tip: Check the AI Analyzer after the quiz to uncover your strengths & weaknesses.",
+        "Quality Control: We take a bit longer to ensure questions match your PDF perfectly.",
+        "Did you know? You can review all answers against the document after finishing."
+      ];
+      
+      setLoadingTip(tips[0]);
+      let tipIndex = 0;
+
+      // Rotate tips every 3 seconds to ensure user has time to read
+      tipInterval = setInterval(() => {
+        tipIndex = (tipIndex + 1) % tips.length;
+        setLoadingTip(tips[tipIndex]);
+      }, 3000);
+
       interval = setInterval(() => {
-        p += Math.random() * 15; 
+        p += Math.random() * 3; // Slower progress to match the reading time
         if (p > 95) p = 95; 
         
         setLoadingProgress(p);
 
-        if (p < 25) setLoadingStage("Analyzing document structure...");
+        if (p < 30) setLoadingStage("Analyzing document structure...");
         else if (p < 50) setLoadingStage("Extracting key concepts...");
-        else if (p < 75) setLoadingStage("Drafting questions...");
-        else setLoadingStage("Finalizing...");
-      }, 50); 
+        else if (p < 80) setLoadingStage("Drafting high-quality questions...");
+        else setLoadingStage("Finalizing quiz...");
+      }, 150); 
     }
-    return () => clearInterval(interval);
+    return () => {
+        clearInterval(interval);
+        clearInterval(tipInterval);
+    };
   }, [isLoading, loadingType]);
 
   const handleFileUpload = async (uploadedFile: UploadedFile) => {
@@ -84,6 +106,7 @@ const App: React.FC = () => {
     setIsLoading(true);
     setLoadingType('upload');
     setLoadingText("AI is extracting topics...");
+    setLoadingStage("Processing document...");
     
     try {
       const topicList = await analyzeTopics(uploadedFile);
@@ -257,6 +280,76 @@ const App: React.FC = () => {
             </button>
         </div>
       </div>
+    </div>
+  );
+
+  return (
+    <div className="h-[100dvh] w-full bg-slate-50 relative overflow-hidden text-slate-900 font-sans">
+        {isLoading && (
+            <div className="absolute inset-0 z-50 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in p-4">
+                <div className="w-24 h-24 relative mb-8">
+                    <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
+                    <div 
+                        className="absolute inset-0 border-4 border-[#07bc0c] rounded-full border-t-transparent animate-spin"
+                    ></div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-lg font-bold text-[#07bc0c]">{Math.round(loadingProgress)}%</span>
+                    </div>
+                </div>
+                <h3 className="text-2xl font-bold text-slate-800 mb-2 animate-pulse text-center">{loadingText}</h3>
+                <p className="text-slate-500 font-medium mb-8 text-center">{loadingStage}</p>
+                
+                {loadingType === 'quiz' && (
+                    <div className="max-w-md w-full bg-slate-50 p-5 rounded-2xl border border-slate-200 text-center animate-fade-in-up shadow-sm">
+                        <p className="text-slate-700 text-sm md:text-base leading-relaxed font-medium transition-all duration-500">
+                             <span className="text-[#07bc0c] font-bold block mb-2 flex items-center justify-center gap-2">
+                                <Lightbulb className="w-4 h-4" /> Did You Know?
+                             </span>
+                             {loadingTip}
+                        </p>
+                    </div>
+                )}
+            </div>
+        )}
+
+        {mode === AppMode.UPLOAD && <FileUpload onFileUpload={handleFileUpload} />}
+        
+        {mode === AppMode.DASHBOARD && <Dashboard />}
+
+        {mode === AppMode.QUIZ_CONFIG && (
+            <QuizConfig 
+                topics={topics} 
+                onStart={handleStartQuizGen} 
+                onBack={() => setMode(AppMode.DASHBOARD)} 
+            />
+        )}
+
+        {mode === AppMode.QUIZ_PLAY && quizSettings && (
+            <QuizGame 
+                questions={currentQuestions} 
+                settings={quizSettings} 
+                onFinish={handleQuizFinish} 
+            />
+        )}
+
+        {mode === AppMode.QUIZ_REVIEW && file && (
+            <QuizReview 
+                questions={currentQuestions} 
+                results={quizResults} 
+                topic={currentQuizTopic} 
+                file={file}
+                onRetry={() => setMode(AppMode.QUIZ_CONFIG)}
+                onExit={() => setMode(AppMode.DASHBOARD)}
+                onUnlockNext={handleUnlockNext}
+            />
+        )}
+
+        {mode === AppMode.CHAT && file && (
+            <ChatInterface 
+                file={file} 
+                onBack={() => setMode(AppMode.DASHBOARD)} 
+            />
+        )}
     </div>
   );
 };
