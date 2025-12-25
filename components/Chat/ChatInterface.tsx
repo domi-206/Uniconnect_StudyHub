@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Copy, Edit2, Trash2, Bot, User, Sparkles, Reply, X, Rocket, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Copy, Edit2, Trash2, Bot, User, Sparkles, Reply, X, Loader2, RefreshCw, Send, ChevronLeft, AlertCircle } from 'lucide-react';
 import { ChatMessage, UploadedFile } from '../../types';
 import { createChatSession } from '../../services/geminiService';
 import { Chat } from '@google/genai';
@@ -7,21 +8,20 @@ import { Chat } from '@google/genai';
 interface ChatInterfaceProps {
   file: UploadedFile;
   onBack: () => void;
+  isDarkMode?: boolean;
 }
 
-// Simple formatter component for Bold, Paragraphs, Lists
-const FormattedText: React.FC<{ text: string }> = ({ text }) => {
+const FormattedText: React.FC<{ text: string, isDarkMode?: boolean, isUser?: boolean }> = ({ text, isDarkMode, isUser }) => {
   const lines = text.split('\n');
   const elements: React.ReactNode[] = [];
   
   let inList = false;
 
   lines.forEach((line, i) => {
-     // Bold parsing
      const parts = line.split(/(\*\*.*?\*\*)/g);
      const formattedLine = parts.map((part, idx) => {
         if (part.startsWith('**') && part.endsWith('**')) {
-            return <strong key={idx} className="font-bold text-slate-900">{part.slice(2, -2)}</strong>;
+            return <strong key={idx} className={`font-extrabold ${isUser ? 'text-white' : (isDarkMode ? 'text-[#07bc0c]' : 'text-slate-900')}`}>{part.slice(2, -2)}</strong>;
         }
         return part;
      });
@@ -31,29 +31,29 @@ const FormattedText: React.FC<{ text: string }> = ({ text }) => {
      if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
          if (!inList) { inList = true; }
          elements.push(
-            <div key={i} className="flex items-start gap-2 ml-2 mb-1 text-slate-700">
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 mt-2 shrink-0"></span>
-                <span>{formattedLine.slice(1)}</span>
+            <div key={i} className={`flex items-start gap-3 ml-2 mb-2 ${isUser ? 'text-white/90' : (isDarkMode ? 'text-slate-300' : 'text-slate-700')}`}>
+                <span className="w-1.5 h-1.5 rounded-full bg-[#07bc0c] mt-2.5 shrink-0"></span>
+                <span className="text-lg leading-relaxed">{formattedLine.slice(1)}</span>
             </div>
          );
      } else {
          inList = false;
          if (trimmed === '') {
-             elements.push(<div key={i} className="h-2"></div>);
+             elements.push(<div key={i} className="h-4"></div>);
          } else if (line.startsWith('###')) {
-             elements.push(<h3 key={i} className="text-lg font-bold mt-3 mb-2 text-slate-800">{line.replace(/^###\s*/, '')}</h3>);
+             elements.push(<h3 key={i} className={`text-xl font-black mt-6 mb-3 ${isUser ? 'text-white' : (isDarkMode ? 'text-white' : 'text-slate-900')}`}>{line.replace(/^###\s*/, '')}</h3>);
          } else {
-             elements.push(<p key={i} className="mb-1 leading-relaxed text-slate-700">{formattedLine}</p>);
+             elements.push(<p key={i} className={`mb-2 leading-relaxed text-lg ${isUser ? 'text-white/90' : (isDarkMode ? 'text-slate-300' : 'text-slate-700')}`}>{formattedLine}</p>);
          }
      }
   });
 
-  return <div>{elements}</div>;
+  return <div className="markdown-content">{elements}</div>;
 }
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack }) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack, isDarkMode }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: '1', role: 'model', text: `Hello! I've analyzed **${file.name}**. \n\nI can help you:\n- Summarize key points\n- Explain complex concepts\n- Answer specific questions`, timestamp: Date.now() }
+    { id: '1', role: 'model', text: `Hi there! I've loaded **${file.name}**. I'm ready to help you dissect this document and answer any questions you have. \n\nHow should we start?`, timestamp: Date.now() }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -64,9 +64,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack }) => {
   const [connectionError, setConnectionError] = useState(false);
   
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Initialize Chat Session on Mount
   useEffect(() => {
     initChat();
   }, [file]);
@@ -87,7 +86,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack }) => {
 
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
     }
   }, [messages, isTyping, replyTo]);
 
@@ -98,7 +97,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack }) => {
     let fullMessageText = userText;
     
     if (replyTo) {
-        fullMessageText = `[Replying to: "${replyTo.text.substring(0, 100)}..."]\n\n${userText}`;
+        fullMessageText = `[Replying to: "${replyTo.text.substring(0, 80)}..."]\n\n${userText}`;
     }
 
     setInputValue('');
@@ -116,9 +115,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack }) => {
     setIsTyping(true);
 
     try {
-      // Using the persistent chat session which already has the file context
       const response = await chatSession.sendMessage({ message: fullMessageText });
-      const responseText = response.text || "I couldn't generate a response. Please try again.";
+      const responseText = response.text || "I'm having trouble understanding that. Could you rephrase?";
       
       const newModelMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -132,7 +130,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack }) => {
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         role: 'model',
-        text: "Sorry, I encountered an error communicating with the AI. Please try sending your message again.",
+        text: "The connection dropped. Please check your network and try again.",
         timestamp: Date.now()
       }]);
     } finally {
@@ -145,81 +143,71 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack }) => {
     navigator.clipboard.writeText(text);
   };
 
-  const handleDelete = (id: string) => {
-    setMessages(prev => prev.filter(m => m.id !== id));
-  };
-
   const handleRestartChat = async () => {
-      if (window.confirm("Are you sure you want to clear the entire chat history?")) {
+      if (window.confirm("Clear chat history?")) {
           setMessages([{ 
               id: Date.now().toString(), 
               role: 'model', 
-              text: `Chat restarted. Ask me anything about **${file.name}**.`, 
+              text: `Context cleared. Ask me anything new about **${file.name}**.`, 
               timestamp: Date.now() 
           }]);
-          
-          // Re-initialize session to clear model context
           initChat();
       }
   };
 
-  const handleEdit = (id: string, currentText: string) => {
-    handleDelete(id);
-    const cleanText = currentText.replace(/^\[Replying to: .*?\]\n\n/, '');
-    setInputValue(cleanText);
-    inputRef.current?.focus();
-  };
-
-  const handleReply = (msg: ChatMessage) => {
-      setReplyTo(msg);
-      inputRef.current?.focus();
-  };
-
   return (
-    <div className="flex flex-col h-full bg-white relative">
-      {/* Header */}
-      <div className="h-14 md:h-16 border-b border-slate-100 flex items-center justify-between px-4 md:px-6 bg-white/90 backdrop-blur-md z-10 sticky top-0 shrink-0">
-        <button onClick={onBack} className="text-slate-500 hover:text-slate-800 font-medium transition-colors text-sm md:text-base flex items-center gap-1">
-          &larr; <span className="hidden xs:inline">Exit</span>
-        </button>
-        <div className="flex items-center gap-2">
-            <div className="bg-[#07bc0c]/10 p-1.5 md:p-2 rounded-full">
-                <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-[#07bc0c]" />
+    <div className={`flex flex-col h-full relative font-sans transition-colors duration-300 ${isDarkMode ? 'bg-slate-950' : 'bg-[#fdfdfd]'}`}>
+      {/* Dynamic Header */}
+      <header className={`h-20 glass border-b flex items-center justify-between px-6 z-30 sticky top-0 shrink-0 ${isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/80 border-slate-100'}`}>
+        <div className="flex items-center gap-6">
+            <button onClick={onBack} className={`p-2 rounded-2xl transition-all flex items-center gap-2 font-bold text-sm ${isDarkMode ? 'text-slate-500 hover:text-white hover:bg-slate-800' : 'text-slate-400 hover:text-slate-800 hover:bg-slate-100'}`}>
+              <ChevronLeft className="w-5 h-5" /> Back
+            </button>
+            <div className={`h-8 w-px ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}></div>
+            <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-900/40 relative">
+                    <Bot className="w-7 h-7 text-white" />
+                    <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-4 ${isDarkMode ? 'border-slate-900' : 'border-white'} ${isConnecting ? 'bg-amber-400 animate-pulse' : (connectionError ? 'bg-red-500' : 'bg-[#07bc0c]')}`}></div>
+                </div>
+                <div>
+                    <h2 className={`font-black text-lg leading-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Study Assistant</h2>
+                    <p className={`text-xs font-bold uppercase tracking-widest ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{isConnecting ? 'Initializing...' : (connectionError ? 'Error' : 'Online')}</p>
+                </div>
             </div>
-            <h2 className="font-bold text-slate-800 text-sm md:text-base truncate max-w-[150px] md:max-w-none">
-                AI Assistant 
-                {isConnecting && <span className="hidden md:inline text-xs font-normal text-slate-400 ml-2">(Connecting...)</span>}
-                {connectionError && <span className="hidden md:inline text-xs font-bold text-red-500 ml-2">(Connection Failed)</span>}
-            </h2>
         </div>
+        
         <button 
             onClick={handleRestartChat} 
-            className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-red-500 transition-colors"
-            title="Restart Chat"
+            className={`p-3 rounded-2xl transition-all ${isDarkMode ? 'text-slate-500 hover:text-red-400 hover:bg-red-900/10' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}
+            title="Restart Session"
         >
-            <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
+            <Trash2 className="w-5 h-5" />
         </button>
-      </div>
+      </header>
 
-      {/* Messages Area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 md:p-6 space-y-6 md:space-y-8 bg-slate-50/50 pb-4">
+      {/* Modern Chat Stream */}
+      <main ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-10 custom-scrollbar pb-32">
         {connectionError ? (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                <AlertCircle className="w-12 h-12 mb-2 text-red-400" />
-                <p className="mb-4 text-slate-600">Failed to connect to AI service.</p>
+            <div className="flex flex-col items-center justify-center h-full text-center">
+                <div className={`w-20 h-20 rounded-[2rem] flex items-center justify-center mb-4 ${isDarkMode ? 'bg-red-900/20' : 'bg-red-50'}`}>
+                    <AlertCircle className="w-10 h-10 text-red-400" />
+                </div>
+                <h3 className={`text-xl font-black mb-2 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Connection Blocked</h3>
+                <p className={`mb-6 max-w-xs ${isDarkMode ? 'text-slate-500' : 'text-slate-500'}`}>We couldn't establish a link with the AI engine.</p>
                 <button 
                     onClick={initChat}
-                    className="flex items-center gap-2 px-6 py-2 bg-slate-800 text-white rounded-full hover:bg-slate-700"
+                    className="flex items-center gap-2 px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all"
                 >
-                    <RefreshCw className="w-4 h-4" /> Retry Connection
+                    <RefreshCw className="w-5 h-5" /> Try Reconnecting
                 </button>
             </div>
         ) : (
-            <>
+            <div className="max-w-4xl mx-auto space-y-10">
                 {messages.map((msg) => {
                     const isReply = msg.text.startsWith('[Replying to:');
                     let displayText = msg.text;
                     let replyContext = '';
+                    const isUser = msg.role === 'user';
                     
                     if (isReply) {
                         const parts = msg.text.split(']\n\n');
@@ -228,122 +216,94 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack }) => {
                     }
 
                     return (
-                    <div key={msg.id} className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
-                        <div className={`flex max-w-[95%] md:max-w-[70%] gap-2 md:gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                        
-                        {/* Avatar */}
-                        <div className={`hidden md:flex w-10 h-10 rounded-full items-center justify-center shrink-0 shadow-sm ${msg.role === 'user' ? 'bg-[#07bc0c]' : 'bg-white border border-slate-200'}`}>
-                            {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <Bot className="w-5 h-5 text-[#07bc0c]" />}
-                        </div>
-
-                        {/* Bubble */}
-                        <div className="group relative">
-                            {isReply && (
-                                <div className={`text-xs mb-1 opacity-70 flex items-center gap-1 ${msg.role === 'user' ? 'text-right justify-end text-slate-500' : 'text-slate-500'}`}>
-                                    <Reply className="w-3 h-3" />
-                                    Replying to: {replyContext.substring(0, 20)}...
+                        <div key={msg.id} className={`flex w-full group animate-slide-up ${isUser ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`flex flex-col gap-2 max-w-[90%] md:max-w-[80%] ${isUser ? 'items-end' : 'items-start'}`}>
+                                {isReply && (
+                                    <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${isDarkMode ? 'bg-slate-800 text-slate-500' : 'bg-slate-100 text-slate-400'}`}>
+                                        <Reply className="w-3 h-3" /> Reply: {replyContext.substring(0, 30)}...
+                                    </div>
+                                )}
+                                
+                                <div className={`relative p-6 md:p-8 rounded-[2.5rem] shadow-xl text-lg leading-relaxed ${
+                                    isUser 
+                                        ? 'bg-[#07bc0c] text-white rounded-tr-none shadow-[#07bc0c]/20' 
+                                        : isDarkMode
+                                            ? 'bg-slate-900 text-slate-300 border border-slate-800 rounded-tl-none shadow-slate-950/40'
+                                            : 'bg-white text-slate-700 border border-slate-100 rounded-tl-none shadow-slate-200/40'
+                                }`}>
+                                    <FormattedText text={displayText} isDarkMode={isDarkMode} isUser={isUser} />
+                                    
+                                    {/* Bubble Actions */}
+                                    <div className={`absolute top-0 flex gap-2 transition-all opacity-0 group-hover:opacity-100 ${isUser ? 'right-full mr-4' : 'left-full ml-4'}`}>
+                                        <button onClick={() => handleCopy(msg.text)} className={`p-3 border rounded-2xl shadow-sm transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-500 hover:text-white' : 'bg-white border-slate-100 text-slate-400 hover:text-slate-900'}`}><Copy className="w-4 h-4"/></button>
+                                        <button onClick={() => setReplyTo(msg)} className={`p-3 border rounded-2xl shadow-sm transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-500 hover:text-white' : 'bg-white border-slate-100 text-slate-400 hover:text-slate-900'}`}><Reply className="w-4 h-4"/></button>
+                                    </div>
                                 </div>
-                            )}
-                            <div className={`p-4 md:p-5 rounded-2xl md:rounded-3xl shadow-sm text-sm md:text-base leading-relaxed relative ${
-                            msg.role === 'user' 
-                                ? 'bg-[#07bc0c] text-white rounded-tr-none' 
-                                : 'bg-white text-slate-700 border border-slate-200 rounded-tl-none'
-                            }`}>
-                            <FormattedText text={displayText} />
-                            </div>
-                            
-                            {/* Actions (Hover/Touch) */}
-                            <div className={`flex gap-2 mt-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-all duration-200 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <button onClick={() => handleReply(msg)} className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-[#07bc0c] transition-all" title="Reply">
-                                <Reply className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => handleCopy(msg.text)} className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-[#07bc0c] transition-all" title="Copy">
-                                <Copy className="w-3.5 h-3.5" />
-                            </button>
-                            {msg.role === 'user' && (
-                                <>
-                                    <button onClick={() => handleEdit(msg.id, msg.text)} className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-[#07bc0c] transition-all" title="Edit">
-                                        <Edit2 className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button onClick={() => handleDelete(msg.id)} className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-red-500 transition-all" title="Delete Message">
-                                        <X className="w-3.5 h-3.5" />
-                                    </button>
-                                </>
-                            )}
                             </div>
                         </div>
-                        </div>
-                    </div>
                     );
                 })}
+                
                 {isTyping && (
-                <div className="flex justify-start w-full animate-pulse">
-                    <div className="flex gap-4 max-w-[70%]">
-                        <div className="hidden md:flex w-10 h-10 rounded-full bg-white border border-slate-200 items-center justify-center shrink-0">
-                            <Bot className="w-5 h-5 text-[#07bc0c]" />
-                        </div>
-                        <div className="bg-white p-4 md:p-5 rounded-3xl rounded-tl-none border border-slate-100 flex items-center gap-1.5">
+                    <div className="flex justify-start animate-fade">
+                        <div className={`p-6 rounded-[2rem] rounded-tl-none border shadow-xl flex items-center gap-2 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
                             <span className="w-2 h-2 bg-[#07bc0c] rounded-full animate-bounce"></span>
-                            <span className="w-2 h-2 bg-[#07bc0c] rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></span>
                             <span className="w-2 h-2 bg-[#07bc0c] rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></span>
+                            <span className="w-2 h-2 bg-[#07bc0c] rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></span>
                         </div>
                     </div>
-                </div>
                 )}
-            </>
-        )}
-      </div>
-
-      {/* Input Area */}
-      <div className="p-3 md:p-6 bg-white border-t border-slate-100 relative shrink-0">
-        {/* Reply Preview */}
-        {replyTo && (
-            <div className="absolute top-[-3.5rem] left-2 right-2 md:left-6 md:right-6 bg-white border border-slate-200 shadow-lg rounded-xl p-3 flex items-center justify-between animate-fade-in-up">
-                <div className="flex items-center gap-3 overflow-hidden">
-                    <Reply className="w-4 h-4 text-[#07bc0c] shrink-0" />
-                    <div className="flex flex-col">
-                        <span className="text-xs font-bold text-[#07bc0c]">Replying to {replyTo.role}</span>
-                        <span className="text-xs text-slate-500 truncate max-w-[200px] md:max-w-md">{replyTo.text}</span>
-                    </div>
-                </div>
-                <button onClick={() => setReplyTo(null)} className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600">
-                    <X className="w-4 h-4" />
-                </button>
             </div>
         )}
+      </main>
 
-        <div 
-            className="max-w-4xl mx-auto relative bg-slate-50 rounded-[1.5rem] md:rounded-[2rem] flex items-center transition-all border border-slate-200 focus-within:ring-2 focus-within:ring-[#07bc0c]/20 focus-within:border-[#07bc0c] focus-within:bg-white focus-within:shadow-xl shadow-sm"
-            onClick={() => inputRef.current?.focus()}
-        >
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            disabled={isConnecting || connectionError}
-            placeholder={isConnecting ? "Initializing..." : (connectionError ? "Failed" : (replyTo ? "Reply..." : "Type a message..."))}
-            className="w-full bg-transparent px-4 py-3 md:px-8 md:py-5 text-slate-700 placeholder-slate-400 focus:outline-none text-base md:text-lg disabled:opacity-50"
-          />
-          <button
-            onClick={handleSend}
-            disabled={!inputValue.trim() || isConnecting || connectionError}
-            className={`mr-2 md:mr-3 p-2 md:p-3 rounded-full transition-all duration-300 group overflow-hidden relative w-10 h-10 md:w-12 md:h-12 flex items-center justify-center ${
-                inputValue.trim() && !isConnecting && !connectionError
-                ? 'bg-[#07bc0c] text-white shadow-lg hover:shadow-[#07bc0c]/40 hover:scale-105 active:scale-95' 
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-            }`}
-          >
-             <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ${isSending ? 'opacity-0 translate-y-[-200%]' : 'opacity-100'}`}>
-                {isConnecting ? (
-                    <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
-                ) : (
-                    <Rocket className={`w-5 h-5 md:w-6 md:h-6 transform transition-transform group-hover:-rotate-45 ${inputValue.trim() ? 'animate-pulse' : ''}`} />
-                )}
-             </div>
-             <div className={`absolute inset-0 bg-white/20 transition-all duration-300 rounded-full ${isSending ? 'scale-150 opacity-0' : 'scale-0 opacity-100'}`}></div>
-          </button>
+      {/* Futuristic Floating Input */}
+      <div className="fixed bottom-0 left-0 right-0 p-6 z-40">
+        <div className="max-w-4xl mx-auto relative">
+            {replyTo && (
+                <div className={`absolute bottom-full left-0 right-0 mb-4 glass p-4 rounded-3xl border shadow-2xl animate-slide-up flex items-center justify-between ${isDarkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white/90 border-white'}`}>
+                    <div className="flex items-center gap-4">
+                        <div className="bg-[#07bc0c]/10 p-2 rounded-xl text-[#07bc0c]"><Reply className="w-5 h-5"/></div>
+                        <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Replying to {replyTo.role}</p>
+                            <p className={`text-sm font-bold truncate max-w-[200px] md:max-w-md ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{replyTo.text}</p>
+                        </div>
+                    </div>
+                    <button onClick={() => setReplyTo(null)} className={`p-2 rounded-xl transition-all ${isDarkMode ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-200 text-slate-600'}`}><X className="w-5 h-5"/></button>
+                </div>
+            )}
+            
+            <div className={`glass shadow-[0_20px_50px_rgba(0,0,0,0.1)] rounded-[2.5rem] p-2 flex items-center border transition-all focus-within:ring-4 focus-within:ring-[#07bc0c]/10 group ${isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/80 border-white'}`}>
+                <textarea
+                    ref={inputRef}
+                    rows={1}
+                    value={inputValue}
+                    onChange={(e) => {
+                        setInputValue(e.target.value);
+                        e.target.style.height = 'auto';
+                        e.target.style.height = e.target.scrollHeight + 'px';
+                    }}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSend();
+                        }
+                    }}
+                    placeholder={isConnecting ? "Waking up AI..." : "Message your document..."}
+                    className={`flex-1 bg-transparent px-6 py-4 placeholder-slate-500 focus:outline-none text-lg resize-none max-h-40 min-h-[56px] custom-scrollbar ${isDarkMode ? 'text-white' : 'text-slate-700'}`}
+                />
+                <button
+                    onClick={handleSend}
+                    disabled={!inputValue.trim() || isSending || isConnecting}
+                    className={`p-4 rounded-[1.8rem] transition-all flex items-center justify-center overflow-hidden shrink-0 ${
+                        inputValue.trim() && !isSending && !isConnecting
+                        ? 'bg-[#07bc0c] text-white shadow-lg shadow-[#07bc0c]/30 hover:scale-105 active:scale-95' 
+                        : isDarkMode ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                    }`}
+                >
+                    {isSending ? <Loader2 className="w-7 h-7 animate-spin" /> : <Send className="w-7 h-7" />}
+                </button>
+            </div>
         </div>
       </div>
     </div>

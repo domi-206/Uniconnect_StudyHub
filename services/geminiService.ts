@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Chat } from "@google/genai";
 import { QuizQuestion, UploadedFile, ChatMessage } from "../types";
 
@@ -13,11 +14,12 @@ const getMimeType = (file: UploadedFile) => {
 }
 
 export const analyzeTopics = async (file: UploadedFile): Promise<string[]> => {
+  // Create a new instance right before making an API call
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  // OPTIMIZATION: Shorter prompt, requesting simpler output to reduce latency
+  // Use gemini-3-flash-preview for basic text tasks like topic extraction
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
+    model: "gemini-3-flash-preview",
     contents: {
         parts: [
             { inlineData: { mimeType: getMimeType(file), data: cleanBase64(file.data) } },
@@ -53,16 +55,17 @@ export const generateQuiz = async (
   topic: string, 
   count: number
 ): Promise<QuizQuestion[]> => {
+  // Create a new instance right before making an API call
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-  // OPTIMIZATION: Concise instructions to reduce processing time
+  // Use gemini-3-pro-preview for complex tasks like quiz generation
   const prompt = `Create ${count} multiple-choice questions on "${topic}". 
   Return raw JSON array.
   Format: [{"id":"1","text":"?","options":["A","B","C","D"],"correctAnswerIndex":0,"explanation":"Why"}]
   No markdown.`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
+    model: "gemini-3-pro-preview",
     contents: {
         parts: [
             { inlineData: { mimeType: getMimeType(file), data: cleanBase64(file.data) } },
@@ -105,6 +108,7 @@ export const getQuizFeedback = async (
   questions: QuizQuestion[], 
   results: { questionId: string, isCorrect: boolean }[]
 ): Promise<FeedbackResult> => {
+  // Create a new instance right before making an API call
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const weakAreas = results
@@ -123,7 +127,7 @@ export const getQuizFeedback = async (
     })
     .join("\n");
 
-  // FORMATTING INSTRUCTION: Explicitly request paragraph structure and bolding
+  // Use gemini-3-pro-preview for complex analysis tasks
   const prompt = `User took a quiz.
   Correct: ${strongAreas}
   Incorrect: ${weakAreas}
@@ -137,7 +141,7 @@ export const getQuizFeedback = async (
   }`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
+    model: "gemini-3-pro-preview",
     contents: {
         parts: [
             { inlineData: { mimeType: getMimeType(file), data: cleanBase64(file.data) } },
@@ -170,25 +174,28 @@ export const getQuizFeedback = async (
 
 /**
  * Creates a persistent chat session initialized with the document.
- * This ensures the file is uploaded only once, speeding up subsequent messages.
  */
 export const createChatSession = async (file: UploadedFile): Promise<Chat> => {
+  // Create a new instance right before making an API call
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const chat = ai.chats.create({
-    model: "gemini-2.5-flash",
+    model: "gemini-3-pro-preview",
     config: {
         systemInstruction: "You are a helpful AI study assistant. Answer questions based on the provided document. Be concise. Use markdown with **bold** for key terms."
     }
   });
 
-  // Prime the chat with the document content immediately
+  // Prime the chat with the document content immediately.
+  // Using multi-part message structure within the message parameter as allowed by the SDK.
   try {
       await chat.sendMessage({
-        message: [
-            { inlineData: { mimeType: getMimeType(file), data: cleanBase64(file.data) } },
-            { text: "Here is the document I want to study. Please analyze it and prepare to answer questions about it." }
-        ]
+        message: {
+            parts: [
+                { inlineData: { mimeType: getMimeType(file), data: cleanBase64(file.data) } },
+                { text: "Here is the document I want to study. Please analyze it and prepare to answer questions about it." }
+            ]
+        }
       });
   } catch (e) {
       console.error("Failed to initialize chat with document", e);

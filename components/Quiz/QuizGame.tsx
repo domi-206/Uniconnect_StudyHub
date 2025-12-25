@@ -1,14 +1,16 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { Timer, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Timer, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { QuizQuestion, QuizSettings, QuizResult } from '../../types';
 
 interface QuizGameProps {
   questions: QuizQuestion[];
   settings: QuizSettings;
   onFinish: (results: QuizResult[]) => void;
+  isDarkMode?: boolean;
 }
 
-const QuizGame: React.FC<QuizGameProps> = ({ questions, settings, onFinish }) => {
+const QuizGame: React.FC<QuizGameProps> = ({ questions, settings, onFinish, isDarkMode }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(settings.timePerQuestion);
   const [answers, setAnswers] = useState<(number | null)[]>(new Array(questions.length).fill(null));
@@ -28,7 +30,6 @@ const QuizGame: React.FC<QuizGameProps> = ({ questions, settings, onFinish }) =>
   }, [answers, onFinish, questions, timeTakenPerQuestion]);
 
   const handleNext = useCallback(() => {
-    // Check total time limit
     if (settings.totalTimeLimit > 0 && (totalTimeElapsed / 60) >= settings.totalTimeLimit) {
         handleFinish();
         return;
@@ -36,10 +37,8 @@ const QuizGame: React.FC<QuizGameProps> = ({ questions, settings, onFinish }) =>
 
     if (currentIndex < questions.length - 1) {
       setCurrentIndex(prev => prev + 1);
-      // Reset question timer
       setTimeLeft(settings.timePerQuestion);
     } else {
-      // Last question - Submit
       handleFinish();
     }
   }, [currentIndex, questions.length, settings.totalTimeLimit, settings.timePerQuestion, totalTimeElapsed, handleFinish]);
@@ -51,7 +50,6 @@ const QuizGame: React.FC<QuizGameProps> = ({ questions, settings, onFinish }) =>
       }
   }, [currentIndex, settings.timePerQuestion]);
 
-  // Timer Effect
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft(prev => {
@@ -84,69 +82,82 @@ const QuizGame: React.FC<QuizGameProps> = ({ questions, settings, onFinish }) =>
   };
 
   const progress = ((currentIndex + 1) / questions.length) * 100;
-  const timerProgress = (timeLeft / settings.timePerQuestion) * 100;
+  const timerPct = (timeLeft / settings.timePerQuestion) * 100;
 
   return (
-    <div className="max-w-4xl mx-auto h-full flex flex-col bg-slate-50 overflow-hidden relative">
-      {/* Header */}
-      <div className="shrink-0 pt-4 px-4 md:px-6 mb-2 md:mb-6">
-        <div className="flex justify-between items-end mb-3 md:mb-4">
-          <div className="flex flex-col">
-            <span className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">Question</span>
-            <span className="text-slate-800 font-bold text-lg md:text-xl">{currentIndex + 1} <span className="text-slate-400 text-base md:text-lg font-medium">/ {questions.length}</span></span>
+    <div className={`h-full w-full flex flex-col overflow-hidden select-none transition-colors duration-300 ${isDarkMode ? 'bg-slate-950' : 'bg-[#f8fafc]'}`}>
+      {/* Immersive Header */}
+      <div className="shrink-0 p-6 md:px-10 md:pt-10 flex flex-col gap-6">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-4">
+             <div className="bg-slate-900 text-white w-14 h-14 rounded-2xl flex flex-col items-center justify-center shadow-lg">
+                <span className="text-xs font-black uppercase opacity-60 leading-none mb-1">Q</span>
+                <span className="text-xl font-black leading-none">{currentIndex + 1}</span>
+             </div>
+             <div>
+                <p className={`text-xs font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Progress</p>
+                <p className={`font-extrabold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{Math.round(progress)}% Complete</p>
+             </div>
           </div>
-          <div className="flex items-center gap-2 bg-white px-3 py-1.5 md:px-4 md:py-2 rounded-full shadow-sm border border-slate-200">
-            <Timer className={`w-4 h-4 md:w-5 md:h-5 ${timeLeft < 10 ? 'text-red-500' : 'text-[#07bc0c]'}`} />
-            <span className={`font-mono font-bold text-lg md:text-xl ${timeLeft < 10 ? 'text-red-500' : 'text-slate-700'}`}>{timeLeft}s</span>
+
+          <div className={`flex items-center gap-3 px-6 py-3 rounded-2xl shadow-sm border ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+            <Timer className={`w-5 h-5 ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-[#07bc0c]'}`} />
+            <div className="flex flex-col items-end">
+                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest leading-none mb-1">Time Left</p>
+                <span className={`font-mono font-black text-2xl leading-none ${timeLeft < 10 ? 'text-red-500' : (isDarkMode ? 'text-slate-200' : 'text-slate-700')}`}>{timeLeft}s</span>
+            </div>
           </div>
         </div>
         
-        {/* Progress Bar */}
-        <div className="w-full bg-slate-200 h-2 md:h-3 rounded-full overflow-hidden relative">
-          <div 
-            className="bg-[#07bc0c] h-full transition-all duration-500 ease-out shadow-[0_0_10px_#07bc0c]" 
-            style={{ width: `${progress}%` }}
-          />
+        {/* Modern Bar */}
+        <div className={`relative h-2 w-full rounded-full overflow-hidden shadow-inner ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'}`}>
+            <div 
+                className="absolute top-0 left-0 h-full bg-[#07bc0c] transition-all duration-700 ease-out shadow-[0_0_15px_#07bc0c]/30" 
+                style={{ width: `${progress}%` }}
+            />
+            <div 
+                className={`absolute top-0 right-0 h-full transition-all duration-1000 linear opacity-30 ${timeLeft < 5 ? 'bg-red-500' : 'bg-transparent'}`}
+                style={{ width: `${100 - timerPct}%` }}
+            />
         </div>
-        {/* Timer Line */}
-        <div 
-            className={`h-1 mt-1 rounded-full transition-all duration-1000 linear ${timeLeft < 5 ? 'bg-red-500' : 'bg-transparent'}`}
-            style={{ width: `${timerProgress}%` }}
-        />
       </div>
 
-      {/* Question Card - Scrollable Container */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2 md:px-6 custom-scrollbar">
-        <div key={currentIndex} className="bg-white rounded-2xl md:rounded-[2rem] shadow-xl shadow-slate-200/50 p-5 md:p-10 border border-slate-100 min-h-full flex flex-col justify-center animate-fade-in-up">
-            <h2 className="text-xl md:text-3xl font-bold text-slate-800 mb-6 md:mb-8 leading-snug">
+      {/* Play Area */}
+      <div className="flex-1 overflow-y-auto px-6 pb-20 md:px-10 custom-scrollbar">
+        <div key={currentIndex} className={`max-w-4xl mx-auto glass rounded-[3rem] shadow-2xl p-8 md:p-14 border animate-slide-up quiz-card ${isDarkMode ? 'bg-slate-900/40 border-slate-800 shadow-slate-950/50' : 'bg-white/70 border-white shadow-slate-200/50'}`}>
+            <h2 className={`text-2xl md:text-4xl font-extrabold mb-10 leading-snug tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
             {currentQuestion.text}
             </h2>
 
-            <div className="space-y-3 md:space-y-4 pb-4">
+            <div className="grid grid-cols-1 gap-4">
             {currentQuestion.options.map((option, idx) => {
                 const isSelected = answers[currentIndex] === idx;
                 
-                // Neutral styling until submission
-                let cardClass = "border-slate-200 hover:border-indigo-400 hover:bg-slate-50";
-                if (isSelected) {
-                    cardClass = "border-indigo-600 bg-indigo-50 shadow-md ring-1 ring-indigo-600";
-                }
-
                 return (
                 <button
                     key={idx}
                     onClick={() => handleSelectOption(idx)}
-                    className={`w-full text-left p-4 md:p-6 rounded-xl md:rounded-2xl border-2 transition-all duration-200 flex items-center justify-between group ${cardClass}`}
+                    className={`w-full text-left p-6 md:p-8 rounded-[2rem] border-2 transition-all duration-300 flex items-center justify-between group transform hover:scale-[1.01] ${
+                        isSelected 
+                        ? 'border-[#07bc0c] bg-[#07bc0c]/5 shadow-lg ring-4 ring-[#07bc0c]/10' 
+                        : isDarkMode 
+                            ? 'border-slate-800 bg-slate-900/40 hover:border-[#07bc0c]/40 hover:bg-slate-800'
+                            : 'border-slate-100 bg-white hover:border-[#07bc0c]/40 hover:bg-slate-50'
+                    }`}
                 >
-                    <div className="flex items-center gap-3 md:gap-5">
-                        <span className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm font-bold border shrink-0 ${
-                            isSelected ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200'
+                    <div className="flex items-center gap-6">
+                        <span className={`w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center text-lg font-black border-2 shrink-0 transition-colors ${
+                            isSelected ? 'bg-[#07bc0c] text-white border-[#07bc0c]' : (isDarkMode ? 'bg-slate-950 text-slate-600 border-slate-800 group-hover:border-[#07bc0c]/30' : 'bg-slate-50 text-slate-400 border-slate-100 group-hover:border-[#07bc0c]/30')
                         }`}>
                             {String.fromCharCode(65 + idx)}
                         </span>
-                        <span className={`font-semibold text-base md:text-lg ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{option}</span>
+                        <span className={`font-bold text-lg md:text-xl ${isSelected ? 'text-[#07bc0c]' : (isDarkMode ? 'text-slate-300' : 'text-slate-700')}`}>{option}</span>
                     </div>
-                    {isSelected && <div className="w-4 h-4 md:w-5 md:h-5 rounded-full bg-indigo-600 flex items-center justify-center shrink-0"><div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-white rounded-full"></div></div>}
+                    {isSelected && (
+                        <div className="bg-[#07bc0c] p-1.5 rounded-full shadow-md animate-fade">
+                            <CheckCircle2 className="w-5 h-5 text-white" />
+                        </div>
+                    )}
                 </button>
                 );
             })}
@@ -154,32 +165,37 @@ const QuizGame: React.FC<QuizGameProps> = ({ questions, settings, onFinish }) =>
         </div>
       </div>
 
-      {/* Footer Controls - Sticky Bottom */}
-      <div className="shrink-0 flex justify-between items-center h-auto py-4 px-4 md:px-6 md:h-24 bg-slate-50 border-t border-slate-100 md:border-0 z-10">
-        <button
-            onClick={handlePrevious}
-            disabled={currentIndex === 0}
-            className={`flex items-center gap-2 md:gap-3 px-5 py-3 md:px-8 md:py-4 rounded-full font-bold text-sm md:text-lg transition-all ${
-                currentIndex === 0 
-                ? 'opacity-40 cursor-not-allowed bg-slate-100 text-slate-400' 
-                : 'text-slate-600 hover:bg-slate-200 hover:text-slate-900 shadow-sm border border-transparent hover:border-slate-300 bg-white'
-            }`}
-        >
-            <ArrowLeft className="w-5 h-5 md:w-6 md:h-6" />
-            <span className="hidden xs:inline">Previous</span>
-        </button>
+      {/* Floating Footer Controls */}
+      <div className="shrink-0 flex justify-center pb-8 px-6 relative z-10 -mt-10">
+        <div className={`glass px-6 py-4 rounded-[2.5rem] flex items-center gap-4 shadow-2xl border ${isDarkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white/90 border-white'}`}>
+            <button
+                onClick={handlePrevious}
+                disabled={currentIndex === 0}
+                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${
+                    currentIndex === 0 
+                    ? 'opacity-20 cursor-not-allowed bg-slate-200 text-slate-400' 
+                    : isDarkMode 
+                        ? 'bg-slate-800 text-slate-400 hover:text-[#07bc0c] hover:bg-slate-700 border border-slate-700'
+                        : 'bg-white text-slate-600 hover:text-[#07bc0c] hover:bg-[#07bc0c]/5 hover:scale-110 active:scale-90 border border-slate-100'
+                }`}
+            >
+                <ArrowLeft className="w-6 h-6" />
+            </button>
 
-        <button
-            onClick={handleNext}
-            className={`flex items-center gap-2 md:gap-3 px-6 py-3 md:px-10 md:py-4 rounded-full font-bold text-sm md:text-lg transition-all transform hover:scale-105 hover:shadow-xl shadow-lg ${
-                currentIndex === questions.length - 1
-                ? 'bg-[#07bc0c] text-white hover:bg-[#06a00a]' // Green for Submit
-                : 'bg-slate-900 text-white hover:bg-slate-800' // Dark for Next
-            }`}
-        >
-            {currentIndex === questions.length - 1 ? "Submit" : "Next"}
-            <ArrowRight className="w-5 h-5 md:w-6 md:h-6" />
-        </button>
+            <div className={`h-8 w-px mx-2 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'}`}></div>
+
+            <button
+                onClick={handleNext}
+                className={`flex items-center gap-3 px-10 py-5 rounded-[2rem] font-black text-lg transition-all transform hover:scale-105 active:scale-95 shadow-xl ${
+                    currentIndex === questions.length - 1
+                    ? 'bg-[#07bc0c] text-white hover:bg-[#06a00a] shadow-[#07bc0c]/40' 
+                    : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-900/30'
+                }`}
+            >
+                {currentIndex === questions.length - 1 ? "Submit Exam" : "Next Question"}
+                <ArrowRight className="w-6 h-6" />
+            </button>
+        </div>
       </div>
     </div>
   );

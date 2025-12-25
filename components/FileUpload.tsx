@@ -1,15 +1,18 @@
+
 import React, { useRef, useState } from 'react';
 import { Upload, FileText, Brain, Zap, AlertTriangle } from 'lucide-react';
 import { UploadedFile } from '../types';
 
 interface FileUploadProps {
   onFileUpload: (file: UploadedFile) => void;
+  isDarkMode?: boolean;
 }
 
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+const LOGO_URL = "https://raw.githubusercontent.com/Anupam-2022/DocuMind/main/logo.png";
 
-const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
+const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isDarkMode }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -57,20 +60,25 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full p-6 animate-fade-in bg-slate-50 relative overflow-hidden">
+    <div className={`flex flex-col items-center justify-center h-full p-6 animate-fade-in relative overflow-hidden transition-colors duration-300 ${isDarkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
       {/* Background decoration */}
       <div className="absolute top-0 left-0 w-full h-2 bg-[#07bc0c] shadow-lg shadow-[#07bc0c]/50"></div>
       
-      <div className="text-center mb-10 relative z-10">
-        <h1 className="text-5xl font-bold text-slate-800 mb-3 tracking-tight">Docu<span className="text-[#07bc0c]">Mind</span></h1>
-        <p className="text-slate-500 text-lg">Your Intelligent Study Companion</p>
+      <div className="flex flex-col items-center mb-10 relative z-10">
+        <div className="mb-4 transform hover:scale-105 transition-transform duration-300">
+           <img src={LOGO_URL} alt="StudyHub Logo" className="h-20 md:h-24 object-contain" />
+        </div>
+        <h1 className={`text-4xl font-extrabold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Study<span className="text-[#07bc0c]">Hub</span></h1>
+        <p className={`text-base md:text-lg font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Your Intelligent Knowledge Base</p>
       </div>
 
       <div
-        className={`w-full max-w-xl h-80 rounded-3xl flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden group ${
+        className={`w-full max-w-xl h-80 rounded-[3rem] flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden group ${
           isDragging
             ? 'border-2 border-[#07bc0c] bg-[#07bc0c]/5 scale-105'
-            : 'border-2 border-dashed border-slate-300 hover:border-[#07bc0c] hover:bg-white hover:shadow-2xl hover:shadow-[#07bc0c]/20 cursor-pointer'
+            : isDarkMode 
+                ? 'border-2 border-dashed border-slate-800 bg-slate-900/40 hover:border-[#07bc0c] hover:bg-slate-900 hover:shadow-2xl hover:shadow-[#07bc0c]/10 cursor-pointer'
+                : 'border-2 border-dashed border-slate-300 hover:border-[#07bc0c] hover:bg-white hover:shadow-2xl hover:shadow-[#07bc0c]/20 cursor-pointer'
         }`}
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
@@ -81,29 +89,26 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
           <div className="flex flex-col items-center justify-center w-full h-full relative">
              {/* Brain Processing Animation */}
              <div className="relative flex items-center justify-center mb-6">
-                 {/* Ripple Effects */}
                  <div className="absolute w-24 h-24 border-4 border-[#07bc0c] rounded-full opacity-0 animate-ripple"></div>
                  <div className="absolute w-24 h-24 border-4 border-[#07bc0c] rounded-full opacity-0 animate-ripple" style={{ animationDelay: '0.6s' }}></div>
-                 <div className="absolute w-24 h-24 border-4 border-[#07bc0c] rounded-full opacity-0 animate-ripple" style={{ animationDelay: '1.2s' }}></div>
                  
-                 {/* Glowing Brain */}
-                 <div className="relative z-10 bg-white p-4 rounded-full shadow-2xl shadow-[#07bc0c]/30 animate-brain-pulse">
+                 <div className={`relative z-10 p-4 rounded-full shadow-2xl shadow-[#07bc0c]/30 animate-brain-pulse ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}>
                     <Brain className="w-16 h-16 text-[#07bc0c]" />
                  </div>
              </div>
              
-             <h3 className="text-xl font-bold text-slate-800 animate-pulse">Processing Document</h3>
-             <p className="text-sm text-slate-400 mt-2">Extracting topics and key concepts...</p>
+             <h3 className={`text-xl font-bold animate-pulse ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Analyzing Knowledge</h3>
+             <p className="text-sm text-slate-400 mt-2">Extracting core concepts...</p>
           </div>
         ) : (
           <>
-            <div className="bg-[#07bc0c]/10 p-6 rounded-full mb-6 group-hover:scale-110 transition-transform duration-300 relative">
+            <div className={`p-6 rounded-full mb-6 group-hover:scale-110 transition-transform duration-300 relative ${isDarkMode ? 'bg-[#07bc0c]/20' : 'bg-[#07bc0c]/10'}`}>
               <Upload className="w-10 h-10 text-[#07bc0c]" />
               <div className="absolute inset-0 bg-[#07bc0c]/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
             </div>
-            <p className="text-xl font-bold text-slate-700 mb-2">Upload your PDF</p>
+            <p className={`text-xl font-bold mb-2 ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>Upload your PDF</p>
             <p className="text-sm text-slate-400">Drag & drop or click to browse</p>
-            <p className="text-xs text-slate-300 mt-2">Max file size: {MAX_FILE_SIZE_MB}MB</p>
+            <p className="text-xs text-slate-300 mt-2 font-bold">Max file size: {MAX_FILE_SIZE_MB}MB</p>
             
             <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#07bc0c]/50 to-transparent transform scale-x-0 group-hover:scale-x-100 transition-transform duration-700"></div>
           </>
@@ -119,24 +124,24 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
       </div>
       
       {error && (
-        <div className="mt-4 flex items-center gap-2 text-red-500 bg-red-50 px-4 py-2 rounded-lg animate-fade-in-up">
+        <div className={`mt-4 flex items-center gap-2 px-4 py-2 rounded-lg animate-fade-in-up ${isDarkMode ? 'bg-red-900/20 text-red-400' : 'bg-red-50 text-red-500'}`}>
             <AlertTriangle className="w-4 h-4" />
             <span className="text-sm font-semibold">{error}</span>
         </div>
       )}
 
       <div className="mt-12 grid grid-cols-2 gap-8 text-sm text-slate-400">
-        <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-full shadow-sm border border-slate-100">
+        <div className={`flex items-center gap-3 px-5 py-3 rounded-full shadow-sm border transition-colors ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
             <div className="bg-[#07bc0c]/10 p-1.5 rounded-full">
                 <FileText className="w-4 h-4 text-[#07bc0c]" />
             </div>
-            <span>Secure & Private</span>
+            <span className={`font-bold ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>Secure Processing</span>
         </div>
-        <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-full shadow-sm border border-slate-100">
+        <div className={`flex items-center gap-3 px-5 py-3 rounded-full shadow-sm border transition-colors ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
             <div className="bg-[#07bc0c]/10 p-1.5 rounded-full">
                 <Zap className="w-4 h-4 text-[#07bc0c]" />
             </div>
-            <span>AI Powered Analysis</span>
+            <span className={`font-bold ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>AI Powered</span>
         </div>
       </div>
     </div>
