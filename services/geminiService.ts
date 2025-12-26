@@ -14,10 +14,8 @@ const getMimeType = (file: UploadedFile) => {
 }
 
 export const analyzeTopics = async (file: UploadedFile): Promise<string[]> => {
-  // Create a new instance right before making an API call
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  // Use gemini-3-flash-preview for basic text tasks like topic extraction
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: {
@@ -38,7 +36,6 @@ export const analyzeTopics = async (file: UploadedFile): Promise<string[]> => {
         }
         return JSON.parse(text); 
     } catch (e) {
-        console.warn("JSON parse failed, attempting cleanup", e);
         const cleanedText = response.text.replace(/```json|```/g, '').trim();
         try {
              return JSON.parse(cleanedText);
@@ -55,14 +52,13 @@ export const generateQuiz = async (
   topic: string, 
   count: number
 ): Promise<QuizQuestion[]> => {
-  // Create a new instance right before making an API call
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-  // Use gemini-3-pro-preview for complex tasks like quiz generation
-  const prompt = `Create ${count} multiple-choice questions on "${topic}". 
+  const prompt = `Create ${count} multiple-choice questions on "${topic}" based on the uploaded document.
+  For each question, you MUST identify the exact page number it references.
   Return raw JSON array.
-  Format: [{"id":"1","text":"?","options":["A","B","C","D"],"correctAnswerIndex":0,"explanation":"Why"}]
-  No markdown.`;
+  Format: [{"id":"1","text":"?","options":["A","B","C","D"],"correctAnswerIndex":0,"explanation":"Why","sourcePage": 5, "sourceContext": "The snippet of text proving the answer"}]
+  No markdown blocks. Ensure sourcePage is an integer representing the PDF page.`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
@@ -84,7 +80,6 @@ export const generateQuiz = async (
         }
         return JSON.parse(text);
      } catch (e) {
-         console.error("Quiz JSON parse failed", e);
          const cleaned = response.text.replace(/```json|```/g, '').trim();
          try {
             return JSON.parse(cleaned);
@@ -108,7 +103,6 @@ export const getQuizFeedback = async (
   questions: QuizQuestion[], 
   results: { questionId: string, isCorrect: boolean }[]
 ): Promise<FeedbackResult> => {
-  // Create a new instance right before making an API call
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const weakAreas = results
@@ -127,16 +121,16 @@ export const getQuizFeedback = async (
     })
     .join("\n");
 
-  // Use gemini-3-pro-preview for complex analysis tasks
   const prompt = `User took a quiz.
-  Correct: ${strongAreas}
-  Incorrect: ${weakAreas}
+  Correct answers related to: ${strongAreas}
+  Incorrect answers related to: ${weakAreas}
   
-  Return a JSON object with this EXACT structure (valid JSON, no markdown code blocks):
+  Analyze their performance against the document content.
+  Return a JSON object:
   {
-      "strengths": ["List 2 specific strong concepts. Use **bold** for key terms."],
-      "weaknesses": ["List 2 specific weak concepts. Use **bold** for key terms."],
-      "focusArea": "Write a clear paragraph explaining exactly what to study. Use **bold** for section names.",
+      "strengths": ["List 2 specific strong concepts."],
+      "weaknesses": ["List 2 specific weak concepts."],
+      "focusArea": "Paragraph on what to study. Use **bold** for key terms.",
       "summary": "One encouraging sentence."
   }`;
 
@@ -172,28 +166,26 @@ export const getQuizFeedback = async (
   };
 };
 
-/**
- * Creates a persistent chat session initialized with the document.
- */
 export const createChatSession = async (file: UploadedFile): Promise<Chat> => {
-  // Create a new instance right before making an API call
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const chat = ai.chats.create({
     model: "gemini-3-pro-preview",
     config: {
-        systemInstruction: "You are a helpful AI study assistant. Answer questions based on the provided document. Be concise. Use markdown with **bold** for key terms."
+        systemInstruction: `You are StudyHub AI, a professional study assistant. 
+        ALWAYS back your answers with specific references from the uploaded document.
+        Use citations in the format [p. X] where X is the page number. 
+        Example: "According to the analysis, the climate is changing [p. 12]."
+        Be concise, use markdown, and ensure your citations are accurate based on the document's structure.`
     }
   });
 
-  // Prime the chat with the document content immediately.
-  // Using multi-part message structure within the message parameter as allowed by the SDK.
   try {
       await chat.sendMessage({
         message: {
             parts: [
                 { inlineData: { mimeType: getMimeType(file), data: cleanBase64(file.data) } },
-                { text: "Here is the document I want to study. Please analyze it and prepare to answer questions about it." }
+                { text: "Here is the document. Please analyze it. From now on, whenever you answer, provide the page number as a citation like [p. X]." }
             ]
         }
       });

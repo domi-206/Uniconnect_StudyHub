@@ -1,9 +1,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Copy, Edit2, Trash2, Bot, User, Sparkles, Reply, X, Loader2, RefreshCw, Send, ChevronLeft, AlertCircle } from 'lucide-react';
+import { Copy, Edit2, Trash2, Bot, User, Sparkles, Reply, X, Loader2, RefreshCw, Send, ChevronLeft, AlertCircle, FileSearch } from 'lucide-react';
 import { ChatMessage, UploadedFile } from '../../types';
 import { createChatSession } from '../../services/geminiService';
 import { Chat } from '@google/genai';
+import PDFModal from '../PDFModal';
 
 interface ChatInterfaceProps {
   file: UploadedFile;
@@ -11,18 +12,45 @@ interface ChatInterfaceProps {
   isDarkMode?: boolean;
 }
 
-const FormattedText: React.FC<{ text: string, isDarkMode?: boolean, isUser?: boolean }> = ({ text, isDarkMode, isUser }) => {
+const FormattedText: React.FC<{ 
+    text: string, 
+    isDarkMode?: boolean, 
+    isUser?: boolean,
+    onCitationClick: (page: number) => void
+}> = ({ text, isDarkMode, isUser, onCitationClick }) => {
   const lines = text.split('\n');
   const elements: React.ReactNode[] = [];
   
   let inList = false;
 
   lines.forEach((line, i) => {
-     const parts = line.split(/(\*\*.*?\*\*)/g);
+     // Regex to find citations like [p. 5] or [p. 12]
+     const citationRegex = /\[p\.\s*(\d+)\]/g;
+     
+     const parts = line.split(/(\*\*.*?\*\*|\[p\.\s*\d+\])/g);
      const formattedLine = parts.map((part, idx) => {
         if (part.startsWith('**') && part.endsWith('**')) {
             return <strong key={idx} className={`font-extrabold ${isUser ? 'text-white' : (isDarkMode ? 'text-[#07bc0c]' : 'text-slate-900')}`}>{part.slice(2, -2)}</strong>;
         }
+        
+        const match = citationRegex.exec(part);
+        if (match) {
+            const pageNum = parseInt(match[1]);
+            return (
+                <button 
+                    key={idx}
+                    onClick={() => onCitationClick(pageNum)}
+                    className={`inline-flex items-center gap-1 mx-1 px-2 py-0.5 rounded-lg text-xs font-black transition-all ${
+                        isUser 
+                        ? 'bg-white/20 text-white hover:bg-white/30' 
+                        : (isDarkMode ? 'bg-[#07bc0c]/20 text-[#07bc0c] hover:bg-[#07bc0c]/30' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100')
+                    }`}
+                >
+                    <FileSearch className="w-3 h-3" /> p.{pageNum}
+                </button>
+            );
+        }
+        
         return part;
      });
 
@@ -33,7 +61,7 @@ const FormattedText: React.FC<{ text: string, isDarkMode?: boolean, isUser?: boo
          elements.push(
             <div key={i} className={`flex items-start gap-3 ml-2 mb-2 ${isUser ? 'text-white/90' : (isDarkMode ? 'text-slate-300' : 'text-slate-700')}`}>
                 <span className="w-1.5 h-1.5 rounded-full bg-[#07bc0c] mt-2.5 shrink-0"></span>
-                <span className="text-lg leading-relaxed">{formattedLine.slice(1)}</span>
+                <span className="text-lg leading-relaxed">{formattedLine}</span>
             </div>
          );
      } else {
@@ -53,7 +81,7 @@ const FormattedText: React.FC<{ text: string, isDarkMode?: boolean, isUser?: boo
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack, isDarkMode }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: '1', role: 'model', text: `Hi there! I've loaded **${file.name}**. I'm ready to help you dissect this document and answer any questions you have. \n\nHow should we start?`, timestamp: Date.now() }
+    { id: '1', role: 'model', text: `Hi there! I've loaded **${file.name}**. I'm ready to help you dissect this document and answer any questions you have. \n\nI will provide page citations so you can verify the sources in the document. How should we start?`, timestamp: Date.now() }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -63,6 +91,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack, isDarkMode 
   const [isConnecting, setIsConnecting] = useState(true);
   const [connectionError, setConnectionError] = useState(false);
   
+  // PDF Viewer State
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
+  const [viewerPage, setViewerPage] = useState<number | undefined>(undefined);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -139,6 +171,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack, isDarkMode 
     }
   };
 
+  const handleCitationClick = (page: number) => {
+    setViewerPage(page);
+    setIsViewerOpen(true);
+  };
+
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
   };
@@ -148,7 +185,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack, isDarkMode 
           setMessages([{ 
               id: Date.now().toString(), 
               role: 'model', 
-              text: `Context cleared. Ask me anything new about **${file.name}**.`, 
+              text: `Context cleared. Ask me anything new about **${file.name}**. I'll continue providing source references.`, 
               timestamp: Date.now() 
           }]);
           initChat();
@@ -157,6 +194,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack, isDarkMode 
 
   return (
     <div className={`flex flex-col h-full relative font-sans transition-colors duration-300 ${isDarkMode ? 'bg-slate-950' : 'bg-[#fdfdfd]'}`}>
+      <PDFModal 
+        file={file} 
+        isOpen={isViewerOpen} 
+        onClose={() => setIsViewerOpen(false)} 
+        pageNumber={viewerPage}
+        isDarkMode={isDarkMode}
+      />
+
       {/* Dynamic Header */}
       <header className={`h-20 glass border-b flex items-center justify-between px-6 z-30 sticky top-0 shrink-0 ${isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/80 border-slate-100'}`}>
         <div className="flex items-center gap-6">
@@ -231,7 +276,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, onBack, isDarkMode 
                                             ? 'bg-slate-900 text-slate-300 border border-slate-800 rounded-tl-none shadow-slate-950/40'
                                             : 'bg-white text-slate-700 border border-slate-100 rounded-tl-none shadow-slate-200/40'
                                 }`}>
-                                    <FormattedText text={displayText} isDarkMode={isDarkMode} isUser={isUser} />
+                                    <FormattedText 
+                                        text={displayText} 
+                                        isDarkMode={isDarkMode} 
+                                        isUser={isUser} 
+                                        onCitationClick={handleCitationClick}
+                                    />
                                     
                                     {/* Bubble Actions */}
                                     <div className={`absolute top-0 flex gap-2 transition-all opacity-0 group-hover:opacity-100 ${isUser ? 'right-full mr-4' : 'left-full ml-4'}`}>

@@ -1,3 +1,4 @@
+
 export enum AppMode {
   UPLOAD = 'UPLOAD',
   DASHBOARD = 'DASHBOARD',
@@ -25,6 +26,8 @@ export interface QuizQuestion {
   options: string[];
   correctAnswerIndex: number;
   explanation: string;
+  sourcePage?: number; // Page number in PDF
+  sourceContext?: string; // Snippet of text for confirmation
 }
 
 export interface QuizResult {

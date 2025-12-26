@@ -1,8 +1,9 @@
 
 import React, { useEffect, useState } from 'react';
-import { CheckCircle, XCircle, RotateCcw, ArrowRight, TrendingUp, AlertTriangle, Target, Star, Info, Eye, BrainCircuit, Check, X, Lightbulb, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, RotateCcw, ArrowRight, TrendingUp, AlertTriangle, Target, Star, Info, Eye, BrainCircuit, Check, X, Lightbulb, ChevronDown, ChevronUp, Loader2, FileSearch } from 'lucide-react';
 import { QuizQuestion, QuizResult, UploadedFile } from '../../types';
 import { getQuizFeedback, FeedbackResult } from '../../services/geminiService';
+import PDFModal from '../PDFModal';
 
 interface QuizReviewProps {
   questions: QuizQuestion[];
@@ -66,6 +67,10 @@ const QuizReview: React.FC<QuizReviewProps> = ({
   const [showAnalysis, setShowAnalysis] = useState(true);
   const [feedback, setFeedback] = useState<FeedbackResult | null>(null);
   const [isLoadingFeedback, setIsLoadingFeedback] = useState(true);
+  
+  // Reference Viewer State
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
+  const [selectedRefPage, setSelectedRefPage] = useState<number | undefined>(undefined);
 
   const correctCount = results.filter(r => r.isCorrect).length;
   const score = Math.round((correctCount / questions.length) * 100);
@@ -81,8 +86,23 @@ const QuizReview: React.FC<QuizReviewProps> = ({
         .catch(() => setIsLoadingFeedback(false));
   }, []);
 
+  const openReference = (page?: number) => {
+    setSelectedRefPage(page);
+    setIsViewerOpen(true);
+  };
+
   return (
     <div className={`max-w-7xl mx-auto p-4 md:p-8 h-full flex flex-col overflow-hidden font-sans transition-colors duration-300 ${isDarkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
+      
+      {/* Reference Modal */}
+      <PDFModal 
+        file={file} 
+        isOpen={isViewerOpen} 
+        onClose={() => setIsViewerOpen(false)} 
+        pageNumber={selectedRefPage}
+        isDarkMode={isDarkMode}
+      />
+
       {/* Dynamic Header */}
       <div className={`p-6 rounded-3xl shadow-lg border-2 mb-6 shrink-0 flex flex-col md:flex-row items-center justify-between gap-6 transition-colors ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-white'} ${passed ? 'border-[#07bc0c]/20' : 'border-amber-200'}`}>
         <div className="flex items-center gap-6">
@@ -209,7 +229,17 @@ const QuizReview: React.FC<QuizReviewProps> = ({
                                 {idx + 1}
                             </div>
                             <div className="flex-1">
-                                <h4 className={`text-xl md:text-2xl font-extrabold mb-6 leading-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{q.text}</h4>
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                                    <h4 className={`text-xl md:text-2xl font-extrabold leading-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{q.text}</h4>
+                                    {q.sourcePage && (
+                                        <button 
+                                            onClick={() => openReference(q.sourcePage)}
+                                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all shrink-0 ${isDarkMode ? 'bg-indigo-900/20 text-indigo-400 hover:bg-indigo-900/40' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'}`}
+                                        >
+                                            <FileSearch className="w-4 h-4" /> View Source (P.{q.sourcePage})
+                                        </button>
+                                    )}
+                                </div>
                                 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-8">
                                     {q.options.map((opt, i) => {
@@ -235,6 +265,11 @@ const QuizReview: React.FC<QuizReviewProps> = ({
                                     <div>
                                         <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Expert Explanation</p>
                                         <p className={`font-medium leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-700'}`}>{q.explanation}</p>
+                                        {q.sourceContext && (
+                                            <p className={`mt-3 text-sm italic border-l-2 pl-4 ${isDarkMode ? 'text-slate-500 border-slate-700' : 'text-slate-500 border-slate-200'}`}>
+                                                &ldquo;{q.sourceContext}&rdquo;
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                             </div>
