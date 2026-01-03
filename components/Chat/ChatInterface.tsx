@@ -1,6 +1,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, Loader2, Send, ChevronLeft, AlertCircle, FileSearch, Sun, Moon, BookOpen, RefreshCw, CheckCircle, BrainCircuit } from 'lucide-react';
+import { 
+  Sparkles, Loader2, Send, ChevronLeft, AlertCircle, FileSearch, 
+  Sun, Moon, BookOpen, RefreshCw, CheckCircle, BrainCircuit,
+  Trash2, Copy, ThumbsUp, ThumbsDown, Edit3, RotateCcw, Check, X,
+  Rocket
+} from 'lucide-react';
 import { ChatMessage, UploadedFile } from '../../types';
 import { createChatSession } from '../../services/geminiService';
 import { Chat } from '@google/genai';
@@ -20,15 +25,13 @@ const FormattedText: React.FC<{
     isUser: boolean,
     onCitationClick: (page: number) => void
 }> = ({ text, isDarkMode, isUser, onCitationClick }) => {
-  const lines = text.split('\n');
+  const sanitizedText = text.replace(/[#*]/g, '');
+  const lines = sanitizedText.split('\n');
   const elements: React.ReactNode[] = [];
 
   lines.forEach((line, i) => {
-     const parts = line.split(/(\*\*.*?\*\*|\[p\.\s*\d+\])/g);
+     const parts = line.split(/(\[p\.\s*\d+\])/g);
      const formattedLine = parts.map((part, idx) => {
-        if (part.startsWith('**') && part.endsWith('**')) {
-            return <strong key={idx} className={`font-black ${isUser ? 'text-white' : (isDarkMode ? 'text-[#07bc0c]' : 'text-slate-900')}`}>{part.slice(2, -2)}</strong>;
-        }
         const match = /\[p\.\s*(\d+)\]/.exec(part);
         if (match) {
             const pageNum = parseInt(match[1]);
@@ -48,7 +51,7 @@ const FormattedText: React.FC<{
      });
 
      const trimmed = line.trim();
-     if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+     if (trimmed.startsWith('- ')) {
          elements.push(
             <div key={i} className="flex items-start gap-3 ml-2 mb-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#07bc0c] mt-2.5 shrink-0"></span>
@@ -69,12 +72,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, isDarkMode, onOpenQ
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isLaunching, setIsLaunching] = useState(false);
   const [chatSession, setChatSession] = useState<Chat | null>(null);
   const [isConnecting, setIsConnecting] = useState(true);
   const [connectionError, setConnectionError] = useState(false);
   
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [viewerPage, setViewerPage] = useState<number | undefined>(undefined);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -92,7 +97,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, isDarkMode, onOpenQ
         setMessages([{ 
           id: '1', 
           role: 'model', 
-          text: `Neural connection established with **${file.name}**. I'm ready to assist with your study. Ask me anything and I'll cite the source pages like this [p. 1].`, 
+          text: `Neural connection established with ${file.name}. I have analyzed the document content. Ask me anything and I will cite sources like this [p. 1].`, 
           timestamp: Date.now() 
         }]);
         setIsConnecting(false);
@@ -110,12 +115,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, isDarkMode, onOpenQ
   }, [messages, isTyping]);
 
   const handleSend = async () => {
-    // Check all conditions to ensure we can actually send
-    if (!inputValue.trim() || isSending || isConnecting || !chatSession) return;
+    if (!inputValue.trim() || isSending || !chatSession) return;
     
     const userText = inputValue.trim();
     setInputValue('');
     setIsSending(true);
+    setIsLaunching(true);
 
     const newUserMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text: userText, timestamp: Date.now() };
     setMessages(prev => [...prev, newUserMsg]);
@@ -123,7 +128,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, isDarkMode, onOpenQ
 
     try {
       const response = await chatSession.sendMessage({ message: userText });
-      const modelText = response.text || "I was able to process your request but no text was returned.";
+      const modelText = response.text || "Analysis complete, but no text was returned.";
       
       setMessages(prev => [...prev, { 
         id: (Date.now()+1).toString(), 
@@ -136,13 +141,58 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, isDarkMode, onOpenQ
       setMessages(prev => [...prev, { 
         id: Date.now().toString(), 
         role: 'model', 
-        text: "**System Alert:** The connection was interrupted. Please try re-sending or refresh.", 
+        text: "SYSTEM ALERT: Neural link interrupted. Please try re-sending your last query.", 
         timestamp: Date.now() 
       }]);
     } finally { 
       setIsTyping(false); 
       setIsSending(false); 
-      setTimeout(() => inputRef.current?.focus(), 50);
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  };
+
+  const handleDeleteMessage = (id: string) => {
+    setMessages(prev => prev.filter(m => m.id !== id));
+  };
+
+  const handleCopyText = (id: string, text: string) => {
+    const cleanText = text.replace(/[#*]/g, '');
+    navigator.clipboard.writeText(cleanText);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleFeedback = (id: string, type: 'like' | 'dislike') => {
+    setMessages(prev => prev.map(m => {
+      if (m.id === id) {
+        return { ...m, feedback: m.feedback === type ? null : type };
+      }
+      return m;
+    }));
+  };
+
+  const handleRestartChat = () => {
+    if (window.confirm("Restart the conversation? Your current chat history will be lost.")) {
+      setMessages([]);
+      initChat();
+    }
+  };
+
+  const startEditing = (id: string) => {
+    setMessages(prev => prev.map(m => m.id === id ? { ...m, isEditing: true } : m));
+  };
+
+  const cancelEditing = (id: string) => {
+    setMessages(prev => prev.map(m => m.id === id ? { ...m, isEditing: false } : m));
+  };
+
+  const saveEdit = (id: string, newText: string) => {
+    setMessages(prev => prev.map(m => m.id === id ? { ...m, text: newText, isEditing: false } : m));
+  };
+
+  const handleInputInteraction = () => {
+    if (isLaunching && !isSending) {
+      setIsLaunching(false);
     }
   };
 
@@ -183,7 +233,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, isDarkMode, onOpenQ
         </div>
 
         <div className="flex items-center gap-2">
-            <button onClick={onToggleTheme} className={`p-2.5 md:p-3 rounded-xl border transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 text-amber-400' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+            <button 
+              onClick={handleRestartChat} 
+              title="Restart Chat"
+              className={`p-2.5 md:p-3 rounded-xl border transition-all hover:scale-105 active:scale-95 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:text-[#07bc0c]' : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-[#07bc0c]'}`}
+            >
+              <RotateCcw className="w-5 h-5"/>
+            </button>
+            <button onClick={onToggleTheme} className={`p-2.5 md:p-3 rounded-xl border transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 text-amber-400' : 'bg-white border-slate-200 text-slate-400'}`}>
               {isDarkMode ? <Sun className="w-5 h-5"/> : <Moon className="w-5 h-5"/>}
             </button>
             <button onClick={onOpenQuiz} className="hidden xs:flex items-center gap-2 px-4 md:px-5 py-2 md:py-2.5 bg-[#07bc0c] text-white rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-[0.1em] shadow-lg shadow-[#07bc0c]/20 hover:scale-105 active:scale-95 transition-all">
@@ -198,25 +255,97 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, isDarkMode, onOpenQ
              <AlertCircle className="w-8 h-8 md:w-6 md:h-6 shrink-0" />
              <div className="text-center md:text-left">
                 <p className="font-black text-sm uppercase tracking-wider mb-1">Neural Sync Interrupted</p>
-                <p className="text-sm font-medium opacity-90">Failed to index document. <button onClick={initChat} className="underline font-black ml-1 hover:text-red-700 transition-colors">Re-Attempt Sync</button></p>
+                <p className="text-sm font-medium opacity-90">Failed to map document context. <button onClick={initChat} className="underline font-black ml-1 hover:text-red-700 transition-colors text-[#07bc0c]">Re-Attempt Sync</button></p>
              </div>
           </div>
         )}
         
         <div className="max-w-4xl mx-auto space-y-8">
             {messages.map((msg) => (
-                <div key={msg.id} className={`flex w-full animate-slide-up ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`p-5 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-xl max-w-[95%] md:max-w-[85%] ${
+                <div key={msg.id} className={`flex w-full animate-slide-up group/msg ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`relative p-5 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-xl max-w-[95%] md:max-w-[85%] ${
                         msg.role === 'user' 
                         ? 'bg-[#07bc0c] text-white rounded-tr-none shadow-[#07bc0c]/20' 
                         : isDarkMode ? 'bg-slate-900 text-slate-300 border border-slate-800 rounded-tl-none' : 'bg-white text-slate-700 border border-slate-100 rounded-tl-none shadow-slate-200/50'
                     }`}>
-                        <FormattedText 
-                            text={msg.text} 
-                            isDarkMode={isDarkMode} 
-                            isUser={msg.role === 'user'} 
-                            onCitationClick={(p) => { setViewerPage(p); setIsViewerOpen(true); }} 
-                        />
+                        {msg.isEditing ? (
+                          <div className="flex flex-col gap-3 min-w-[200px] md:min-w-[300px]">
+                            <textarea
+                              defaultValue={msg.text}
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                  e.preventDefault();
+                                  saveEdit(msg.id, e.currentTarget.value);
+                                } else if (e.key === 'Escape') {
+                                  cancelEditing(msg.id);
+                                }
+                              }}
+                              className={`w-full bg-black/10 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-white/30 text-white resize-none`}
+                            />
+                            <div className="flex justify-end gap-2">
+                              <button onClick={() => cancelEditing(msg.id)} className="p-2 rounded-lg hover:bg-white/10 transition-colors"><X className="w-4 h-4" /></button>
+                              <button onClick={(e) => {
+                                const ta = (e.currentTarget.parentElement?.previousElementSibling as HTMLTextAreaElement);
+                                saveEdit(msg.id, ta.value);
+                              }} className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors"><Check className="w-4 h-4" /></button>
+                            </div>
+                          </div>
+                        ) : (
+                          <FormattedText 
+                              text={msg.text} 
+                              isDarkMode={isDarkMode} 
+                              isUser={msg.role === 'user'} 
+                              onCitationClick={(p) => { setViewerPage(p); setIsViewerOpen(true); }} 
+                          />
+                        )}
+
+                        {!msg.isEditing && (
+                          <div className={`mt-4 pt-4 border-t border-white/10 flex items-center gap-3 transition-opacity duration-300 opacity-0 group-hover/msg:opacity-100 ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}>
+                              <button 
+                                onClick={() => handleCopyText(msg.id, msg.text)} 
+                                title="Copy Text"
+                                className={`p-1.5 rounded-lg transition-all ${msg.role === 'user' ? 'hover:bg-white/10 text-white/60' : 'hover:bg-slate-800 text-slate-500'}`}
+                              >
+                                {copiedId === msg.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                              
+                              {msg.role === 'user' && (
+                                <button 
+                                  onClick={() => startEditing(msg.id)}
+                                  title="Edit Message"
+                                  className={`p-1.5 rounded-lg transition-all hover:bg-white/10 text-white/60`}
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+
+                              {msg.role === 'model' && (
+                                <>
+                                  <button 
+                                    onClick={() => handleFeedback(msg.id, 'like')}
+                                    className={`p-1.5 rounded-lg transition-all ${msg.feedback === 'like' ? 'text-[#07bc0c] bg-[#07bc0c]/10' : 'text-slate-500 hover:bg-slate-800'}`}
+                                  >
+                                    <ThumbsUp className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleFeedback(msg.id, 'dislike')}
+                                    className={`p-1.5 rounded-lg transition-all ${msg.feedback === 'dislike' ? 'text-red-500 bg-red-500/10' : 'text-slate-500 hover:bg-slate-800'}`}
+                                  >
+                                    <ThumbsDown className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              )}
+
+                              <button 
+                                onClick={() => handleDeleteMessage(msg.id)}
+                                title="Delete Message"
+                                className={`p-1.5 rounded-lg transition-all ${msg.role === 'user' ? 'hover:bg-white/10 text-white/60' : 'hover:bg-slate-800 text-slate-500 hover:text-red-500'}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                          </div>
+                        )}
                     </div>
                 </div>
             ))}
@@ -242,8 +371,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, isDarkMode, onOpenQ
                     rows={1}
                     autoFocus
                     value={inputValue}
+                    onFocus={handleInputInteraction}
                     onChange={(e) => {
                         setInputValue(e.target.value);
+                        handleInputInteraction();
                         e.target.style.height = 'auto';
                         e.target.style.height = e.target.scrollHeight + 'px';
                     }}
@@ -262,18 +393,26 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, isDarkMode, onOpenQ
                 <button
                     onClick={handleSend}
                     disabled={!inputValue.trim() || isSending || isConnecting || !chatSession}
-                    className={`p-3 md:p-4 rounded-[1.2rem] md:rounded-[1.8rem] transition-all flex items-center justify-center shrink-0 ${
+                    className={`p-3 md:p-4 rounded-[1.2rem] md:rounded-[1.8rem] transition-all flex items-center justify-center shrink-0 relative overflow-hidden group ${
                         inputValue.trim() && !isSending && !isConnecting && chatSession
                         ? 'bg-[#07bc0c] text-white shadow-lg shadow-[#07bc0c]/30 hover:scale-105 active:scale-95' 
                         : 'bg-slate-200 text-slate-400 cursor-not-allowed dark:bg-slate-800'
                     }`}
                 >
-                    {isSending ? <Loader2 className="w-5 h-5 md:w-6 md:h-6 animate-spin" /> : <Send className="w-5 h-5 md:w-6 md:h-6" />}
+                    {isSending ? (
+                      <Loader2 className="w-5 h-5 md:w-6 md:h-6 animate-spin" />
+                    ) : (
+                      <Rocket 
+                        className={`w-5 h-5 md:w-6 md:h-6 transition-all duration-700 ease-in-out transform ${
+                          isLaunching ? '-translate-y-[200%] opacity-0 scale-50 rotate-12' : 'translate-y-0 opacity-100 scale-100 -rotate-12 group-hover:rotate-0'
+                        }`} 
+                      />
+                    )}
                 </button>
             </div>
             {(isConnecting || isSending) && (
               <p className="text-center mt-3 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] text-[#07bc0c] animate-pulse">
-                {isConnecting ? "Mapping Neural Pathways..." : "Thinking..."}
+                {isConnecting ? "Calibrating Neural Hub..." : "Processing Query..."}
               </p>
             )}
         </div>

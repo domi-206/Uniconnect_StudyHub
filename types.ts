@@ -41,8 +41,9 @@ export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
   text: string;
-  isEditing?: boolean;
   timestamp: number;
+  isEditing?: boolean;
+  feedback?: 'like' | 'dislike' | null;
 }
 
 export interface TopicStatus {

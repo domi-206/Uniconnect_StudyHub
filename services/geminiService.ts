@@ -74,24 +74,26 @@ export const generateQuiz = async (file: UploadedFile, topic: string, count: num
 export const createChatSession = async (file: UploadedFile): Promise<Chat> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const chat = ai.chats.create({
-    model: "gemini-3-flash-preview", // Flash is faster for handling large document contexts in chat
+    model: "gemini-3-flash-preview",
     config: {
         systemInstruction: `You are StudyHub Assistant. Provide educational support based ONLY on the provided document.
-        RULES:
-        1. Cite page numbers for every fact: [p. X]. 
-        2. If info is missing, say "I cannot find this in the document."
-        3. Maintain an academic, helpful tone.
-        4. Be concise but thorough.`
+        STRICT FORMATTING RULES:
+        1. DO NOT use the # symbol for headers. Use uppercase text for titles instead.
+        2. DO NOT use the * symbol (asterisks) for emphasis, bolding, or lists. 
+        3. For lists, use simple numbers (1, 2, 3) or dashes (-).
+        4. Cite page numbers for every fact using this exact format: [p. X]. 
+        5. If info is missing, say "I cannot find this in the document."
+        6. Maintain an academic, helpful tone.
+        7. Be concise but thorough.
+        8. REMINDER: Absolutely no # or * characters allowed in your output.`
     }
   });
 
   await chat.sendMessage({
-    message: {
-        parts: [
-            { inlineData: { mimeType: getMimeType(file), data: cleanBase64(file.data) } },
-            { text: "System: Document Uploaded. Ingest context and acknowledge when ready for cited analysis." }
-        ]
-    }
+    message: [
+        { inlineData: { mimeType: getMimeType(file), data: cleanBase64(file.data) } },
+        { text: "System: Document Uploaded. Ingest context and verify ready for analysis. Remember: Do not use # or * in any response." }
+    ]
   });
   return chat;
 };
