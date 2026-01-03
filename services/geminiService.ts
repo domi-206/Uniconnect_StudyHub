@@ -85,14 +85,15 @@ export const createChatSession = async (file: UploadedFile): Promise<Chat> => {
         5. If info is missing, say "I cannot find this in the document."
         6. Maintain an academic, helpful tone.
         7. Be concise but thorough.
-        8. REMINDER: Absolutely no # or * characters allowed in your output.`
+        8. REMINDER: Absolutely no # or * characters allowed in your output.
+        9. FOLLOW-UP REQUIREMENT: Every single response MUST end with a friendly follow-up question asking the user if they have any other tasks, if they need further explanation regarding the document, the response, or if anything remains unclear.`
     }
   });
 
   await chat.sendMessage({
     message: [
         { inlineData: { mimeType: getMimeType(file), data: cleanBase64(file.data) } },
-        { text: "System: Document Uploaded. Ingest context and verify ready for analysis. Remember: Do not use # or * in any response." }
+        { text: "System: Document Uploaded. Ingest context and verify ready for analysis. Remember: Do not use # or * in any response and always ask a follow-up question." }
     ]
   });
   return chat;

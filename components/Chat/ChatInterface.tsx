@@ -97,7 +97,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, isDarkMode, onOpenQ
         setMessages([{ 
           id: '1', 
           role: 'model', 
-          text: `Neural connection established with ${file.name}. I have analyzed the document content. Ask me anything and I will cite sources like this [p. 1].`, 
+          text: `Neural connection established with ${file.name}. I have analyzed the document content. Ask me anything and I will cite sources like this [p. 1]. Do you have any other tasks or need further explanation regarding the document?`, 
           timestamp: Date.now() 
         }]);
         setIsConnecting(false);
@@ -191,6 +191,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, isDarkMode, onOpenQ
   };
 
   const handleInputInteraction = () => {
+    // Re-activate rocket when user clicks or interacts with input
     if (isLaunching && !isSending) {
       setIsLaunching(false);
     }
@@ -372,6 +373,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, isDarkMode, onOpenQ
                     autoFocus
                     value={inputValue}
                     onFocus={handleInputInteraction}
+                    onClick={handleInputInteraction}
                     onChange={(e) => {
                         setInputValue(e.target.value);
                         handleInputInteraction();
@@ -404,7 +406,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, isDarkMode, onOpenQ
                     ) : (
                       <Rocket 
                         className={`w-5 h-5 md:w-6 md:h-6 transition-all duration-700 ease-in-out transform ${
-                          isLaunching ? '-translate-y-[200%] opacity-0 scale-50 rotate-12' : 'translate-y-0 opacity-100 scale-100 -rotate-12 group-hover:rotate-0'
+                          isLaunching ? '-translate-y-[400%] opacity-0 scale-50' : 'translate-y-0 opacity-100 scale-100'
                         }`} 
                       />
                     )}
