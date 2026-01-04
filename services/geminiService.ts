@@ -1,6 +1,13 @@
 
-import { GoogleGenAI, Chat } from "@google/genai";
-import { QuizQuestion, UploadedFile } from "../types";
+import { GoogleGenAI, Chat, Modality, Type } from "@google/genai";
+import { QuizQuestion, UploadedFile, VoiceAccent, ContentTone, PodcastSettings, PodcastSegment } from "../types";
+
+export interface FeedbackResult {
+  strengths: string[];
+  weaknesses: string[];
+  focusArea: string;
+  summary: string;
+}
 
 const cleanBase64 = (data: string) => {
   const parts = data.split(',');
@@ -17,26 +24,179 @@ const parseJsonResponse = (text: string) => {
     try {
         return JSON.parse(cleaned);
     } catch (e) {
-        const firstBracket = cleaned.indexOf('[');
-        const firstBrace = cleaned.indexOf('{');
-        let start = -1;
-        let end = -1;
-        if (firstBracket !== -1 && (firstBrace === -1 || (firstBracket < firstBrace))) {
-            start = firstBracket;
-            end = cleaned.lastIndexOf(']');
-        } else if (firstBrace !== -1) {
-            start = firstBrace;
-            end = cleaned.lastIndexOf('}');
-        }
-        if (start !== -1 && end !== -1 && end > start) {
+        const start = cleaned.indexOf('[');
+        const startBrace = cleaned.indexOf('{');
+        const end = Math.max(cleaned.lastIndexOf(']'), cleaned.lastIndexOf('}'));
+        const startIndex = (start !== -1 && (startBrace === -1 || start < startBrace)) ? start : startBrace;
+        
+        if (startIndex !== -1 && end !== -1 && end > startIndex) {
             try {
-                return JSON.parse(cleaned.substring(start, end + 1));
-            } catch (innerError) {
-                console.error("Internal parsing fail", innerError);
-            }
+                return JSON.parse(cleaned.substring(startIndex, end + 1));
+            } catch (inner) {}
         }
         throw new Error("Invalid AI JSON format.");
     }
+};
+
+const getAccentInstruction = (accent: VoiceAccent) => {
+  switch (accent) {
+    case 'NG': return "using a natural Nigerian English style, with clear Nigerian rhythm and local nuances.";
+    case 'UK': return "using a natural British English (UK) style with appropriate British vocabulary.";
+    case 'US': return "using a standard American English (US) style.";
+  }
+};
+
+const getToneInstruction = (tone: ContentTone) => {
+  switch (tone) {
+    case 'FUNNY': return "Be highly entertaining and witty. Use educational jokes and keep the energy high.";
+    case 'PROFESSIONAL': return "Be formal, objective, and precise. Use professional academic terminology.";
+    case 'TEACHER': return "Be encouraging and pedagogical. Explain complex ideas with simple analogies.";
+    case 'FRIEND': return "Be casual and supportive. Talk like a friendly study buddy.";
+  }
+};
+
+export const createChatSession = async (file: UploadedFile, accent: VoiceAccent = 'US', tone: ContentTone = 'TEACHER'): Promise<Chat> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  return ai.chats.create({
+    model: "gemini-3-flash-preview",
+    config: {
+        systemInstruction: `You are the Unispace Study Assistant. Support the user based ONLY on the provided document.
+        STRICT OUTPUT RULES:
+        1. NEVER use the # symbol for headers. Use uppercase text for emphasis.
+        2. NEVER use the * symbol (asterisks). Use dashes (-) for lists.
+        3. Cite page numbers as [p. X].
+        4. ACCENT: Speak ${getAccentInstruction(accent)}.
+        5. TONE: ${getToneInstruction(tone)}.
+        6. ALWAYS end every response with a follow-up question asking if they have any other tasks or need further explanation.`
+    }
+  });
+};
+
+export const initializeChatWithContext = async (chat: Chat, file: UploadedFile) => {
+  await chat.sendMessage({
+    message: [
+        { inlineData: { mimeType: getMimeType(file), data: cleanBase64(file.data) } },
+        { text: "System: Context loaded. Start by greeting the user warmly and ask how you can help with their document today." }
+    ]
+  });
+};
+
+export const speakText = async (text: string, accent: VoiceAccent): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const cleanText = text.replace(/[#*]/g, '').trim();
+  
+  // Basic heuristic for general TTS call
+  const voiceName = accent === 'NG' ? 'Kore' : (accent === 'UK' ? 'Puck' : 'Zephyr');
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash-preview-tts",
+    contents: [{ parts: [{ text: `Speak this ${getAccentInstruction(accent)}: ${cleanText}` }] }],
+    config: {
+      responseModalities: [Modality.AUDIO],
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } }
+    }
+  });
+  const audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+  if (!audio) throw new Error("TTS failed");
+  return audio;
+};
+
+export const generatePodcastContent = async (file: UploadedFile, settings: PodcastSettings): Promise<{ audio: string, segments: PodcastSegment[] }> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const { tone, accent, durationMinutes, speakerCount, selectedTopics, hostAName, hostBName } = settings;
+
+  const topicContext = selectedTopics.length > 0 
+    ? `FOCUS ONLY ON THESE TOPICS: ${selectedTopics.join(', ')}.` 
+    : "Summarize the entire document.";
+
+  const speakerInstruction = speakerCount === 'DOUBLE' 
+    ? `Write this as a conversation between two hosts. Host A is named ${hostAName}, Host B is named ${hostBName}. Use '${hostAName}:' and '${hostBName}:' prefixes.` 
+    : `Write this as a solo presentation by ${hostAName}. Use '${hostAName}:' prefix.`;
+
+  // Use JSON schema to get structured segments for the transcript
+  const scriptResponse = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: [
+      { inlineData: { mimeType: getMimeType(file), data: cleanBase64(file.data) } },
+      { text: `Create a podcast script based on the attached document. 
+               TONE: ${getToneInstruction(tone)}. 
+               ${speakerInstruction}
+               ${topicContext}
+               
+               IMPORTANT: Determine the gender of the host names provided. 
+               Choose appropriate voices:
+               For Female: 'Kore' or 'Zephyr'.
+               For Male: 'Puck', 'Fenrir', or 'Charon'.
+               
+               Return a JSON object with:
+               'voiceHostA': the selected voice name for ${hostAName},
+               'voiceHostB': the selected voice name for ${hostBName} (if double),
+               'segments': array of objects with {startTime (seconds), topic, speaker, text}.
+               Estimated total duration should be ${durationMinutes} minutes.` }
+    ],
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          voiceHostA: { type: Type.STRING },
+          voiceHostB: { type: Type.STRING },
+          segments: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                startTime: { type: Type.NUMBER },
+                topic: { type: Type.STRING },
+                speaker: { type: Type.STRING },
+                text: { type: Type.STRING }
+              },
+              required: ["startTime", "topic", "speaker", "text"]
+            }
+          }
+        },
+        required: ["segments", "voiceHostA"]
+      }
+    }
+  });
+
+  const parsed = parseJsonResponse(scriptResponse.text || "{}");
+  const segments: PodcastSegment[] = parsed.segments || [];
+  const voiceA = parsed.voiceHostA || (accent === 'UK' ? 'Puck' : 'Zephyr');
+  const voiceB = parsed.voiceHostB || (accent === 'UK' ? 'Charon' : 'Kore');
+  
+  // Create raw text for TTS
+  const fullText = segments.map(s => `${s.speaker}: ${s.text}`).join('\n\n');
+
+  const ttsConfig: any = {
+    responseModalities: [Modality.AUDIO]
+  };
+
+  if (speakerCount === 'DOUBLE') {
+    ttsConfig.speechConfig = {
+      multiSpeakerVoiceConfig: {
+        speakerVoiceConfigs: [
+          { speaker: hostAName, voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceA } } },
+          { speaker: hostBName, voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceB } } }
+        ]
+      }
+    };
+  } else {
+    ttsConfig.speechConfig = {
+      voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceA } }
+    };
+  }
+
+  const audioResponse = await ai.models.generateContent({
+    model: "gemini-2.5-flash-preview-tts",
+    contents: [{ parts: [{ text: fullText }] }],
+    config: ttsConfig
+  });
+
+  const audio = audioResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+  if (!audio) throw new Error("Podcast audio generation failed");
+
+  return { audio, segments };
 };
 
 export const analyzeTopics = async (file: UploadedFile): Promise<string[]> => {
@@ -46,7 +206,7 @@ export const analyzeTopics = async (file: UploadedFile): Promise<string[]> => {
     contents: {
         parts: [
             { inlineData: { mimeType: getMimeType(file), data: cleanBase64(file.data) } },
-            { text: "Analyze this document and extract the 5 most distinct study topics. Return ONLY a JSON array of strings. Example: [\"Topic A\", \"Topic B\"]" }
+            { text: "Extract 5 distinct study topics from this PDF. Return ONLY a JSON array of strings." }
         ]
     }
   });
@@ -55,9 +215,8 @@ export const analyzeTopics = async (file: UploadedFile): Promise<string[]> => {
 
 export const generateQuiz = async (file: UploadedFile, topic: string, count: number): Promise<QuizQuestion[]> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const prompt = `Generate exactly ${count} multiple choice questions about "${topic}" based on the provided PDF.
-  REQUIRED JSON FORMAT (NO MARKDOWN):
-  [{"id":"1","text":"Question?","options":["A","B","C","D"],"correctAnswerIndex":0,"explanation":"Explain","sourcePage":1,"sourceContext":"Quote"}]`;
+  const prompt = `Generate ${count} MCQs for "${topic}" based on this PDF.
+  JSON FORMAT: [{"id":"1","text":"Q","options":["A","B","C","D"],"correctAnswerIndex":0,"explanation":"Why","sourcePage":1}]`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -71,44 +230,9 @@ export const generateQuiz = async (file: UploadedFile, topic: string, count: num
   return parseJsonResponse(response.text || "[]");
 };
 
-export const createChatSession = async (file: UploadedFile): Promise<Chat> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const chat = ai.chats.create({
-    model: "gemini-3-flash-preview",
-    config: {
-        systemInstruction: `You are StudyHub Assistant. Provide educational support based ONLY on the provided document.
-        STRICT FORMATTING RULES:
-        1. DO NOT use the # symbol for headers. Use uppercase text for titles instead.
-        2. DO NOT use the * symbol (asterisks) for emphasis, bolding, or lists. 
-        3. For lists, use simple numbers (1, 2, 3) or dashes (-).
-        4. Cite page numbers for every fact using this exact format: [p. X]. 
-        5. If info is missing, say "I cannot find this in the document."
-        6. Maintain an academic, helpful tone.
-        7. Be concise but thorough.
-        8. REMINDER: Absolutely no # or * characters allowed in your output.
-        9. FOLLOW-UP REQUIREMENT: Every single response MUST end with a friendly follow-up question asking the user if they have any other tasks, if they need further explanation regarding the document, the response, or if anything remains unclear.`
-    }
-  });
-
-  await chat.sendMessage({
-    message: [
-        { inlineData: { mimeType: getMimeType(file), data: cleanBase64(file.data) } },
-        { text: "System: Document Uploaded. Ingest context and verify ready for analysis. Remember: Do not use # or * in any response and always ask a follow-up question." }
-    ]
-  });
-  return chat;
-};
-
-export interface FeedbackResult {
-    strengths: string[];
-    weaknesses: string[];
-    focusArea: string;
-    summary: string;
-}
-
 export const getQuizFeedback = async (file: UploadedFile, questions: QuizQuestion[], results: { questionId: string, isCorrect: boolean }[]): Promise<FeedbackResult> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const resultData = results.map(r => ({ question: questions.find(q => q.id === r.questionId)?.text, ok: r.isCorrect }));
+  const resultData = results.map(r => ({ q: questions.find(q => q.id === r.questionId)?.text, ok: r.isCorrect }));
   const prompt = `Analyze these quiz results: ${JSON.stringify(resultData)}. Return JSON with strengths[], weaknesses[], focusArea (string), summary (string).`;
 
   const response = await ai.models.generateContent({

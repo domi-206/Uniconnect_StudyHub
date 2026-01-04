@@ -1,13 +1,13 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  Sparkles, Loader2, Send, ChevronLeft, AlertCircle, FileSearch, 
+  ChevronLeft, AlertCircle, FileSearch, 
   Sun, Moon, BookOpen, RefreshCw, CheckCircle, BrainCircuit,
-  Trash2, Copy, ThumbsUp, ThumbsDown, Edit3, RotateCcw, Check, X,
-  Rocket
+  Trash2, Copy, Edit3, RotateCcw, Check, X,
+  Rocket, Volume2, History, Languages, Plus, Loader2
 } from 'lucide-react';
-import { ChatMessage, UploadedFile } from '../../types';
-import { createChatSession } from '../../services/geminiService';
+import { ChatMessage, UploadedFile, ChatSessionData, VoiceAccent, ContentTone } from '../../types';
+import { createChatSession, speakText, initializeChatWithContext } from '../../services/geminiService';
 import { Chat } from '@google/genai';
 import PDFModal from '../PDFModal';
 
@@ -68,6 +68,12 @@ const FormattedText: React.FC<{
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, isDarkMode, onOpenQuiz, onReset, onToggleTheme }) => {
+  const [history, setHistory] = useState<ChatSessionData[]>(() => {
+    const saved = localStorage.getItem(`chats-${file.name}`);
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -77,72 +83,120 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, isDarkMode, onOpenQ
   const [isConnecting, setIsConnecting] = useState(true);
   const [connectionError, setConnectionError] = useState(false);
   
+  const [accent, setAccent] = useState<VoiceAccent>('US');
+  const [tone, setTone] = useState<ContentTone>('TEACHER');
+  const [showSettings, setShowSettings] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [viewerPage, setViewerPage] = useState<number | undefined>(undefined);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
-  useEffect(() => { 
-    initChat(); 
-  }, [file]);
+  useEffect(() => {
+    localStorage.setItem(`chats-${file.name}`, JSON.stringify(history));
+  }, [history, file.name]);
 
-  const initChat = async () => {
+  const initChat = async (newAccent?: VoiceAccent, newTone?: ContentTone) => {
     setIsConnecting(true);
     setConnectionError(false);
     try {
-        const session = await createChatSession(file);
+        const activeAccent = newAccent || accent;
+        const activeTone = newTone || tone;
+        const session = await createChatSession(file, activeAccent, activeTone);
+        await initializeChatWithContext(session, file);
         setChatSession(session);
-        setMessages([{ 
-          id: '1', 
+        
+        const initialMsg: ChatMessage = { 
+          id: 'initial', 
           role: 'model', 
-          text: `Neural connection established with ${file.name}. I have analyzed the document content. Ask me anything and I will cite sources like this [p. 1]. Do you have any other tasks or need further explanation regarding the document?`, 
+          text: `Welcome! I am your Unispace Study Assistant. I have analyzed ${file.name} and I am ready to help. 
+
+Do you need anything explained? You can ask me questions about the document, or ask me to summarize specific sections. How can I assist you today?`, 
           timestamp: Date.now() 
-        }]);
+        };
+
+        const newId = Date.now().toString();
+        const newSession: ChatSessionData = {
+          id: newId,
+          title: `Session ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+          messages: [initialMsg],
+          lastModified: Date.now(),
+          settings: { accent: activeAccent, tone: activeTone }
+        };
+
+        setHistory(prev => [newSession, ...prev]);
+        setCurrentSessionId(newId);
+        setMessages([initialMsg]);
         setIsConnecting(false);
     } catch (e) { 
-      console.error("AI Assistant Sync Failed", e);
-      setConnectionError(true); 
-      setIsConnecting(false); 
+        console.error("Chat Init Error:", e);
+        setConnectionError(true); 
+        setIsConnecting(false); 
     }
   };
 
   useEffect(() => { 
-    if (scrollRef.current) {
-        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (!currentSessionId) {
+      if (history.length > 0) loadSession(history[0].id);
+      else initChat();
     }
-  }, [messages, isTyping]);
+  }, [file]);
+
+  const loadSession = async (id: string) => {
+    const sessionData = history.find(s => s.id === id);
+    if (!sessionData) return;
+    setIsConnecting(true);
+    setShowHistory(false);
+    try {
+      const session = await createChatSession(file, sessionData.settings.accent, sessionData.settings.tone);
+      setChatSession(session);
+      setMessages(sessionData.messages);
+      setCurrentSessionId(id);
+      setAccent(sessionData.settings.accent);
+      setTone(sessionData.settings.tone);
+      setIsConnecting(false);
+    } catch (e) {
+      setConnectionError(true);
+      setIsConnecting(false);
+    }
+  };
+
+  const updateSessionHistory = (msgs: ChatMessage[]) => {
+    setHistory(prev => prev.map(s => s.id === currentSessionId ? { ...s, messages: msgs, lastModified: Date.now() } : s));
+  };
 
   const handleSend = async () => {
     if (!inputValue.trim() || isSending || !chatSession) return;
-    
     const userText = inputValue.trim();
     setInputValue('');
     setIsSending(true);
     setIsLaunching(true);
 
     const newUserMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text: userText, timestamp: Date.now() };
-    setMessages(prev => [...prev, newUserMsg]);
+    const newMsgs = [...messages, newUserMsg];
+    setMessages(newMsgs);
+    updateSessionHistory(newMsgs);
     setIsTyping(true);
 
     try {
       const response = await chatSession.sendMessage({ message: userText });
-      const modelText = response.text || "Analysis complete, but no text was returned.";
-      
-      setMessages(prev => [...prev, { 
+      const modelText = response.text || "No response received.";
+      const finalMsgs: ChatMessage[] = [...newMsgs, { 
         id: (Date.now()+1).toString(), 
         role: 'model', 
         text: modelText, 
         timestamp: Date.now() 
-      }]);
+      }];
+      setMessages(finalMsgs);
+      updateSessionHistory(finalMsgs);
     } catch (error) {
-      console.error("Chat Interaction Failed", error);
       setMessages(prev => [...prev, { 
-        id: Date.now().toString(), 
-        role: 'model', 
-        text: "SYSTEM ALERT: Neural link interrupted. Please try re-sending your last query.", 
-        timestamp: Date.now() 
+        id: Date.now().toString(), role: 'model', text: "SYSTEM ALERT: Sync lost. Reconnecting...", timestamp: Date.now() 
       }]);
     } finally { 
       setIsTyping(false); 
@@ -151,272 +205,143 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ file, isDarkMode, onOpenQ
     }
   };
 
-  const handleDeleteMessage = (id: string) => {
-    setMessages(prev => prev.filter(m => m.id !== id));
-  };
-
-  const handleCopyText = (id: string, text: string) => {
-    const cleanText = text.replace(/[#*]/g, '');
-    navigator.clipboard.writeText(cleanText);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  const handleFeedback = (id: string, type: 'like' | 'dislike') => {
-    setMessages(prev => prev.map(m => {
-      if (m.id === id) {
-        return { ...m, feedback: m.feedback === type ? null : type };
-      }
-      return m;
-    }));
-  };
-
-  const handleRestartChat = () => {
-    if (window.confirm("Restart the conversation? Your current chat history will be lost.")) {
-      setMessages([]);
-      initChat();
+  const handleSpeak = async (msg: ChatMessage) => {
+    if (speakingId === msg.id) return;
+    setSpeakingId(msg.id);
+    try {
+      const audioData = await speakText(msg.text, accent);
+      await playAudio(audioData);
+    } catch (e) {
+      console.error(e);
+      alert("Voice playback failed.");
+    } finally {
+      setSpeakingId(null);
     }
   };
 
-  const startEditing = (id: string) => {
-    setMessages(prev => prev.map(m => m.id === id ? { ...m, isEditing: true } : m));
-  };
-
-  const cancelEditing = (id: string) => {
-    setMessages(prev => prev.map(m => m.id === id ? { ...m, isEditing: false } : m));
-  };
-
-  const saveEdit = (id: string, newText: string) => {
-    setMessages(prev => prev.map(m => m.id === id ? { ...m, text: newText, isEditing: false } : m));
-  };
-
-  const handleInputInteraction = () => {
-    // Re-activate rocket when user clicks or interacts with input
-    if (isLaunching && !isSending) {
-      setIsLaunching(false);
+  const playAudio = async (base64: string) => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
     }
+    const ctx = audioContextRef.current;
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
+    const dataInt16 = new Int16Array(bytes.buffer);
+    const buffer = ctx.createBuffer(1, dataInt16.length, 24000);
+    const channelData = buffer.getChannelData(0);
+    for (let i = 0; i < dataInt16.length; i++) channelData[i] = dataInt16[i] / 32768.0;
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start();
+    return new Promise(resolve => source.onended = resolve);
   };
+
+  const handleInputActivation = () => {
+    if (isLaunching) setIsLaunching(false);
+  };
+
+  useEffect(() => { 
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages, isTyping]);
 
   return (
-    <div className="flex flex-col h-full relative transition-colors duration-300">
-      <PDFModal 
-        file={file} 
-        isOpen={isViewerOpen} 
-        onClose={() => setIsViewerOpen(false)} 
-        pageNumber={viewerPage} 
-        isDarkMode={isDarkMode} 
-      />
-
-      <header className={`h-20 glass border-b flex items-center justify-between px-4 md:px-6 z-30 transition-colors ${isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/80 border-slate-100'}`}>
-        <div className="flex items-center gap-2 md:gap-4">
-            <button onClick={onReset} className="p-2 md:p-2.5 rounded-2xl hover:bg-red-500/10 text-slate-500 hover:text-red-500 transition-all">
-              <ChevronLeft className="w-5 h-5 md:w-6 md:h-6"/>
-            </button>
-            <div className="flex items-center gap-2 md:gap-3">
-                <div className="w-8 h-8 md:w-10 md:h-10 bg-[#07bc0c] rounded-xl flex items-center justify-center shadow-lg">
-                  <BrainCircuit className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                </div>
-                <div className="flex flex-col">
-                    <div className="flex items-center gap-1.5">
-                      <h2 className={`font-black text-[10px] md:text-sm leading-tight tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Study Assistant</h2>
-                      {isConnecting ? (
-                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[7px] md:text-[9px] font-black uppercase animate-pulse">
-                          <RefreshCw className="w-2 h-2 animate-spin" /> Syncing
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-[7px] md:text-[9px] font-black uppercase">
-                          <CheckCircle className="w-2 h-2" /> Ready
-                        </div>
-                      )}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-            <button 
-              onClick={handleRestartChat} 
-              title="Restart Chat"
-              className={`p-2.5 md:p-3 rounded-xl border transition-all hover:scale-105 active:scale-95 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:text-[#07bc0c]' : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-[#07bc0c]'}`}
-            >
-              <RotateCcw className="w-5 h-5"/>
-            </button>
-            <button onClick={onToggleTheme} className={`p-2.5 md:p-3 rounded-xl border transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 text-amber-400' : 'bg-white border-slate-200 text-slate-400'}`}>
-              {isDarkMode ? <Sun className="w-5 h-5"/> : <Moon className="w-5 h-5"/>}
-            </button>
-            <button onClick={onOpenQuiz} className="hidden xs:flex items-center gap-2 px-4 md:px-5 py-2 md:py-2.5 bg-[#07bc0c] text-white rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-[0.1em] shadow-lg shadow-[#07bc0c]/20 hover:scale-105 active:scale-95 transition-all">
-              <BookOpen className="w-4 h-4"/> Quiz
-            </button>
-        </div>
-      </header>
-
-      <main ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 custom-scrollbar pb-36">
-        {connectionError && (
-          <div className="max-w-2xl mx-auto p-6 rounded-[2rem] border bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400 flex flex-col md:flex-row items-center gap-4 animate-fade shadow-sm">
-             <AlertCircle className="w-8 h-8 md:w-6 md:h-6 shrink-0" />
-             <div className="text-center md:text-left">
-                <p className="font-black text-sm uppercase tracking-wider mb-1">Neural Sync Interrupted</p>
-                <p className="text-sm font-medium opacity-90">Failed to map document context. <button onClick={initChat} className="underline font-black ml-1 hover:text-red-700 transition-colors text-[#07bc0c]">Re-Attempt Sync</button></p>
-             </div>
+    <div className="flex h-full relative transition-colors duration-300">
+      {showHistory && (
+        <div className={`absolute inset-y-0 left-0 w-72 z-50 shadow-2xl animate-fade flex flex-col border-r ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+          <div className="p-6 border-b flex items-center justify-between">
+            <h3 className="font-black text-xs uppercase tracking-widest text-[#07bc0c]">Study Feed</h3>
+            <button onClick={() => setShowHistory(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"><X className="w-4 h-4" /></button>
           </div>
-        )}
-        
-        <div className="max-w-4xl mx-auto space-y-8">
-            {messages.map((msg) => (
-                <div key={msg.id} className={`flex w-full animate-slide-up group/msg ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`relative p-5 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-xl max-w-[95%] md:max-w-[85%] ${
-                        msg.role === 'user' 
-                        ? 'bg-[#07bc0c] text-white rounded-tr-none shadow-[#07bc0c]/20' 
-                        : isDarkMode ? 'bg-slate-900 text-slate-300 border border-slate-800 rounded-tl-none' : 'bg-white text-slate-700 border border-slate-100 rounded-tl-none shadow-slate-200/50'
-                    }`}>
-                        {msg.isEditing ? (
-                          <div className="flex flex-col gap-3 min-w-[200px] md:min-w-[300px]">
-                            <textarea
-                              defaultValue={msg.text}
-                              autoFocus
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                  e.preventDefault();
-                                  saveEdit(msg.id, e.currentTarget.value);
-                                } else if (e.key === 'Escape') {
-                                  cancelEditing(msg.id);
-                                }
-                              }}
-                              className={`w-full bg-black/10 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-white/30 text-white resize-none`}
-                            />
-                            <div className="flex justify-end gap-2">
-                              <button onClick={() => cancelEditing(msg.id)} className="p-2 rounded-lg hover:bg-white/10 transition-colors"><X className="w-4 h-4" /></button>
-                              <button onClick={(e) => {
-                                const ta = (e.currentTarget.parentElement?.previousElementSibling as HTMLTextAreaElement);
-                                saveEdit(msg.id, ta.value);
-                              }} className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors"><Check className="w-4 h-4" /></button>
-                            </div>
-                          </div>
-                        ) : (
-                          <FormattedText 
-                              text={msg.text} 
-                              isDarkMode={isDarkMode} 
-                              isUser={msg.role === 'user'} 
-                              onCitationClick={(p) => { setViewerPage(p); setIsViewerOpen(true); }} 
-                          />
-                        )}
-
-                        {!msg.isEditing && (
-                          <div className={`mt-4 pt-4 border-t border-white/10 flex items-center gap-3 transition-opacity duration-300 opacity-0 group-hover/msg:opacity-100 ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}>
-                              <button 
-                                onClick={() => handleCopyText(msg.id, msg.text)} 
-                                title="Copy Text"
-                                className={`p-1.5 rounded-lg transition-all ${msg.role === 'user' ? 'hover:bg-white/10 text-white/60' : 'hover:bg-slate-800 text-slate-500'}`}
-                              >
-                                {copiedId === msg.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                              </button>
-                              
-                              {msg.role === 'user' && (
-                                <button 
-                                  onClick={() => startEditing(msg.id)}
-                                  title="Edit Message"
-                                  className={`p-1.5 rounded-lg transition-all hover:bg-white/10 text-white/60`}
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-
-                              {msg.role === 'model' && (
-                                <>
-                                  <button 
-                                    onClick={() => handleFeedback(msg.id, 'like')}
-                                    className={`p-1.5 rounded-lg transition-all ${msg.feedback === 'like' ? 'text-[#07bc0c] bg-[#07bc0c]/10' : 'text-slate-500 hover:bg-slate-800'}`}
-                                  >
-                                    <ThumbsUp className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button 
-                                    onClick={() => handleFeedback(msg.id, 'dislike')}
-                                    className={`p-1.5 rounded-lg transition-all ${msg.feedback === 'dislike' ? 'text-red-500 bg-red-500/10' : 'text-slate-500 hover:bg-slate-800'}`}
-                                  >
-                                    <ThumbsDown className="w-3.5 h-3.5" />
-                                  </button>
-                                </>
-                              )}
-
-                              <button 
-                                onClick={() => handleDeleteMessage(msg.id)}
-                                title="Delete Message"
-                                className={`p-1.5 rounded-lg transition-all ${msg.role === 'user' ? 'hover:bg-white/10 text-white/60' : 'hover:bg-slate-800 text-slate-500 hover:text-red-500'}`}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                          </div>
-                        )}
-                    </div>
-                </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+            <button onClick={() => { setShowHistory(false); initChat(); }} className="w-full p-4 rounded-2xl bg-[#07bc0c] text-white font-black text-xs uppercase tracking-widest shadow-lg flex items-center justify-center gap-2 hover:scale-[1.02] transition-all mb-4">
+              <Plus className="w-4 h-4" /> New Study Session
+            </button>
+            {history.map(s => (
+              <button key={s.id} onClick={() => loadSession(s.id)} className={`w-full text-left p-4 rounded-2xl border transition-all ${currentSessionId === s.id ? 'border-[#07bc0c] bg-[#07bc0c]/5 text-[#07bc0c]' : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-500'}`}>
+                <div className="font-bold text-sm truncate">{s.title}</div>
+                <div className="text-[10px] opacity-60">{new Date(s.lastModified).toLocaleDateString()}</div>
+              </button>
             ))}
-            {isTyping && (
-                <div className="flex justify-start animate-fade">
-                    <div className={`p-5 px-8 rounded-[1.5rem] rounded-tl-none border shadow-xl flex items-center gap-2 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 shadow-slate-200/50'}`}>
-                        <div className="w-2 h-2 bg-[#07bc0c] rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-[#07bc0c] rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                        <div className="w-2 h-2 bg-[#07bc0c] rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
-                    </div>
-                </div>
-            )}
+          </div>
         </div>
-      </main>
+      )}
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 md:p-6 z-40 bg-gradient-to-t from-slate-50 dark:from-slate-950 via-slate-50/80 dark:via-slate-950/80 to-transparent">
-        <div className="max-w-4xl mx-auto">
-            <div className={`glass shadow-2xl rounded-[1.8rem] md:rounded-[2.5rem] p-2 flex items-center border transition-all focus-within:ring-4 focus-within:ring-[#07bc0c]/10 ${
-                isDarkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-white'
-            }`}>
-                <textarea
-                    ref={inputRef}
-                    rows={1}
-                    autoFocus
-                    value={inputValue}
-                    onFocus={handleInputInteraction}
-                    onClick={handleInputInteraction}
-                    onChange={(e) => {
-                        setInputValue(e.target.value);
-                        handleInputInteraction();
-                        e.target.style.height = 'auto';
-                        e.target.style.height = e.target.scrollHeight + 'px';
-                    }}
-                    onKeyDown={(e) => { 
-                        if (e.key === 'Enter' && !e.shiftKey) { 
-                            e.preventDefault(); 
-                            handleSend(); 
-                        } 
-                    }}
-                    placeholder={isConnecting ? "Assistant is Syncing..." : "Query your document..."}
-                    disabled={isConnecting || isSending}
-                    className={`flex-1 bg-transparent px-4 md:px-6 py-4 focus:outline-none text-sm md:text-lg resize-none max-h-40 min-h-[56px] custom-scrollbar ${
-                        isDarkMode ? 'text-white' : 'text-slate-700'
-                    } ${isConnecting ? 'cursor-not-allowed opacity-50 italic' : ''}`}
-                />
-                <button
-                    onClick={handleSend}
-                    disabled={!inputValue.trim() || isSending || isConnecting || !chatSession}
-                    className={`p-3 md:p-4 rounded-[1.2rem] md:rounded-[1.8rem] transition-all flex items-center justify-center shrink-0 relative overflow-hidden group ${
-                        inputValue.trim() && !isSending && !isConnecting && chatSession
-                        ? 'bg-[#07bc0c] text-white shadow-lg shadow-[#07bc0c]/30 hover:scale-105 active:scale-95' 
-                        : 'bg-slate-200 text-slate-400 cursor-not-allowed dark:bg-slate-800'
-                    }`}
-                >
-                    {isSending ? (
-                      <Loader2 className="w-5 h-5 md:w-6 md:h-6 animate-spin" />
-                    ) : (
-                      <Rocket 
-                        className={`w-5 h-5 md:w-6 md:h-6 transition-all duration-700 ease-in-out transform ${
-                          isLaunching ? '-translate-y-[400%] opacity-0 scale-50' : 'translate-y-0 opacity-100 scale-100'
-                        }`} 
-                      />
-                    )}
-                </button>
-            </div>
-            {(isConnecting || isSending) && (
-              <p className="text-center mt-3 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] text-[#07bc0c] animate-pulse">
-                {isConnecting ? "Calibrating Neural Hub..." : "Processing Query..."}
-              </p>
-            )}
+      <div className="flex-1 flex flex-col min-w-0 h-full">
+        <PDFModal file={file} isOpen={isViewerOpen} onClose={() => setIsViewerOpen(false)} pageNumber={viewerPage} isDarkMode={isDarkMode} />
+
+        <header className={`h-20 glass border-b flex items-center justify-between px-4 md:px-6 z-30 ${isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/80 border-slate-100'}`}>
+          <div className="flex items-center gap-2">
+              <button onClick={onReset} className="p-2 rounded-xl text-slate-500 hover:text-red-500 transition-all"><ChevronLeft className="w-6 h-6"/></button>
+              <button onClick={() => setShowHistory(true)} className="p-2.5 rounded-xl border transition-all text-slate-500 hover:text-[#07bc0c]"><History className="w-5 h-5" /></button>
+              <div className="hidden xs:flex items-center gap-3">
+                  <div className="w-10 h-10 bg-[#07bc0c] rounded-xl flex items-center justify-center shadow-lg"><BrainCircuit className="w-6 h-6 text-white" /></div>
+                  <h2 className={`font-black text-sm ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Unispace Assistant</h2>
+              </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+              <div className="relative">
+                <button onClick={() => setShowSettings(!showSettings)} className={`p-2.5 rounded-xl border transition-all ${showSettings ? 'bg-[#07bc0c] text-white border-[#07bc0c]' : (isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-400')}`}><Languages className="w-5 h-5"/></button>
+                {showSettings && (
+                  <div className={`absolute top-full right-0 mt-4 w-64 p-6 rounded-[2rem] shadow-2xl border z-[100] animate-fade ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-white'}`}>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-[10px] font-black uppercase opacity-60 block mb-2 tracking-widest">Voice Accent</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {(['US', 'UK', 'NG'] as VoiceAccent[]).map(v => (
+                            <button key={v} onClick={() => { setAccent(v); setShowSettings(false); initChat(v, tone); }} className={`p-2 rounded-xl text-[10px] font-black border transition-all ${accent === v ? 'bg-[#07bc0c] text-white' : 'bg-slate-50 dark:bg-slate-800'}`}>{v}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black uppercase opacity-60 block mb-2 tracking-widest">Assistant Tone</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(['TEACHER', 'PROFESSIONAL', 'FRIEND', 'FUNNY'] as ContentTone[]).map(t => (
+                            <button key={t} onClick={() => { setTone(t); setShowSettings(false); initChat(accent, t); }} className={`p-2 rounded-xl text-[8px] font-black border transition-all ${tone === t ? 'bg-[#07bc0c] text-white' : 'bg-slate-50 dark:bg-slate-800'}`}>{t}</button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <button onClick={onToggleTheme} className={`p-2.5 rounded-xl border transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 text-amber-400' : 'bg-white border-slate-200 text-slate-400'}`}>{isDarkMode ? <Sun className="w-5 h-5"/> : <Moon className="w-5 h-5"/>}</button>
+          </div>
+        </header>
+
+        <main ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 custom-scrollbar pb-36">
+          <div className="max-w-4xl mx-auto space-y-8">
+              {messages.map((msg) => (
+                  <div key={msg.id} className={`flex w-full animate-slide-up ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`relative p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-xl max-w-[90%] group ${msg.role === 'user' ? 'bg-[#07bc0c] text-white rounded-tr-none' : isDarkMode ? 'bg-slate-900 text-slate-300 border border-slate-800 rounded-tl-none' : 'bg-white text-slate-700 border border-slate-100 rounded-tl-none'}`}>
+                          <FormattedText text={msg.text} isDarkMode={isDarkMode} isUser={msg.role === 'user'} onCitationClick={(p) => { setViewerPage(p); setIsViewerOpen(true); }} />
+                          {msg.role === 'model' && (
+                            <div className="mt-4 pt-4 border-t border-black/5 flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => handleSpeak(msg)} className={`p-2 rounded-lg transition-all ${speakingId === msg.id ? 'text-[#07bc0c] animate-pulse bg-[#07bc0c]/10' : 'text-slate-400 hover:text-[#07bc0c] hover:bg-slate-100'}`}><Volume2 className="w-5 h-5" /></button>
+                                <button onClick={() => { navigator.clipboard.writeText(msg.text.replace(/[#*]/g, '')); setCopiedId(msg.id); setTimeout(()=>setCopiedId(null), 2000); }} className="p-2 text-slate-400 hover:text-slate-600">{copiedId === msg.id ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}</button>
+                            </div>
+                          )}
+                      </div>
+                  </div>
+              ))}
+              {isTyping && (
+                  <div className="flex justify-start animate-fade">
+                      <div className={`p-5 px-8 rounded-[1.5rem] rounded-tl-none border shadow-xl flex items-center gap-2 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}><div className="w-2 h-2 bg-[#07bc0c] rounded-full animate-bounce"></div><div className="w-2 h-2 bg-[#07bc0c] rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div><div className="w-2 h-2 bg-[#07bc0c] rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div></div>
+                  </div>
+              )}
+          </div>
+        </main>
+
+        <div className="fixed bottom-0 left-0 right-0 p-4 md:p-6 z-40 bg-gradient-to-t from-slate-50 dark:from-slate-950 via-slate-50/80 dark:via-slate-950/80 to-transparent">
+          <div className="max-w-4xl mx-auto">
+              <div className={`glass shadow-2xl rounded-[2.5rem] p-2 flex items-center border transition-all focus-within:ring-4 focus-within:ring-[#07bc0c]/10 ${isDarkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-white'}`}>
+                  <textarea ref={inputRef} rows={1} autoFocus value={inputValue} onFocus={handleInputActivation} onClick={handleInputActivation} onChange={(e) => { setInputValue(e.target.value); handleInputActivation(); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} placeholder={isConnecting ? "Assistant ready..." : "Consult your document..."} disabled={isConnecting || isSending} className={`flex-1 bg-transparent px-6 py-4 focus:outline-none text-sm md:text-lg resize-none max-h-40 ${isDarkMode ? 'text-white' : 'text-slate-700'}`} />
+                  <button onClick={handleSend} disabled={!inputValue.trim() || isSending || isConnecting} className={`p-4 rounded-[1.8rem] transition-all flex items-center justify-center shrink-0 relative overflow-hidden group ${inputValue.trim() && !isSending && !isConnecting ? 'bg-[#07bc0c] text-white shadow-lg' : 'bg-slate-200 text-slate-400 dark:bg-slate-800'}`}>{isSending ? <Loader2 className="w-6 h-6 animate-spin" /> : <Rocket className={`w-6 h-6 transition-all duration-1000 transform ${isLaunching ? '-translate-y-[500%] opacity-0' : 'translate-y-0 opacity-100'}`} />}</button>
+              </div>
+          </div>
         </div>
       </div>
     </div>

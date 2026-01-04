@@ -75,7 +75,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isDarkMode, progr
               </h1>
             </div>
             <p className={`text-lg md:text-2xl font-medium leading-relaxed max-w-2xl px-4 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              Master your documents with <span className={isDarkMode ? 'text-[#07bc0c]' : 'text-[#059609] font-bold'}>AI-driven precision</span>. Upload now to begin.
+              Master your documents with <span className={isDarkMode ? 'text-[#07bc0c]' : 'text-[#059609] font-bold'}>absolute precision</span>. A product of Unispace.
             </p>
           </div>
 
@@ -114,7 +114,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isDarkMode, progr
                     </div>
                     <div className="space-y-3 px-4">
                       <h3 className={`text-xl md:text-2xl font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                        {stage || "Processing File"}
+                        {stage || "Synchronizing Document"}
                       </h3>
                       <div className="flex items-center justify-center gap-2">
                          <div className="w-2 h-2 bg-[#07bc0c] rounded-full animate-bounce"></div>
@@ -164,10 +164,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isDarkMode, progr
           
           <div className="flex flex-wrap items-center justify-center gap-6 md:gap-10 pt-4 opacity-50">
              <div className="flex items-center gap-2 font-black text-[10px] md:text-xs uppercase tracking-widest text-slate-500">
-                <Zap className="w-4 h-4 text-[#07bc0c]" /> Gemini Powered
+                <Zap className="w-4 h-4 text-[#07bc0c]" /> Advanced Processing
              </div>
              <div className="flex items-center gap-2 font-black text-[10px] md:text-xs uppercase tracking-widest text-slate-500">
-                <Brain className="w-4 h-4 text-[#07bc0c]" /> AI Extraction
+                <Brain className="w-4 h-4 text-[#07bc0c]" /> Content Analysis
              </div>
           </div>
 
