@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Timer, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { QuizQuestion, QuizSettings, QuizResult } from '../../types';
 
@@ -8,16 +8,62 @@ interface QuizGameProps {
   settings: QuizSettings;
   onFinish: (results: QuizResult[]) => void;
   isDarkMode?: boolean;
+  topic: string;
 }
 
-const QuizGame: React.FC<QuizGameProps> = ({ questions, settings, onFinish, isDarkMode }) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
+const QuizGame: React.FC<QuizGameProps> = ({ questions, settings, onFinish, isDarkMode, topic }) => {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  
+  const [currentIndex, setCurrentIndex] = useState(() => {
+    const saved = localStorage.getItem(`quiz-index-${topic}`);
+    return saved ? parseInt(saved) : 0;
+  });
+  
   const [timeLeft, setTimeLeft] = useState(settings.timePerQuestion);
-  const [answers, setAnswers] = useState<(number | null)[]>(new Array(questions.length).fill(null));
-  const [timeTakenPerQuestion, setTimeTakenPerQuestion] = useState<number[]>(new Array(questions.length).fill(0));
-  const [totalTimeElapsed, setTotalTimeElapsed] = useState(0);
+  
+  const [answers, setAnswers] = useState<(number | null)[]>(() => {
+    const saved = localStorage.getItem(`quiz-answers-${topic}`);
+    return saved ? JSON.parse(saved) : new Array(questions.length).fill(null);
+  });
+  
+  const [timeTakenPerQuestion, setTimeTakenPerQuestion] = useState<number[]>(() => {
+    const saved = localStorage.getItem(`quiz-timetaken-${topic}`);
+    return saved ? JSON.parse(saved) : new Array(questions.length).fill(0);
+  });
+  
+  const [totalTimeElapsed, setTotalTimeElapsed] = useState(() => {
+    const saved = localStorage.getItem(`quiz-totaltime-${topic}`);
+    return saved ? parseInt(saved) : 0;
+  });
 
   const currentQuestion = questions[currentIndex];
+
+  // Save progress
+  useEffect(() => {
+    localStorage.setItem(`quiz-index-${topic}`, currentIndex.toString());
+    localStorage.setItem(`quiz-answers-${topic}`, JSON.stringify(answers));
+    localStorage.setItem(`quiz-timetaken-${topic}`, JSON.stringify(timeTakenPerQuestion));
+    localStorage.setItem(`quiz-totaltime-${topic}`, totalTimeElapsed.toString());
+  }, [currentIndex, answers, timeTakenPerQuestion, totalTimeElapsed, topic]);
+
+  // Scroll to top on question change
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    // Alternatively, scroll the window if nested scroll is tricky
+    if (cardRef.current) {
+        cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [currentIndex]);
+
+  const clearQuizStorage = useCallback(() => {
+    localStorage.removeItem(`quiz-index-${topic}`);
+    localStorage.removeItem(`quiz-answers-${topic}`);
+    localStorage.removeItem(`quiz-timetaken-${topic}`);
+    localStorage.removeItem(`quiz-totaltime-${topic}`);
+  }, [topic]);
 
   const handleFinish = useCallback(() => {
      const finalResults: QuizResult[] = questions.map((q, idx) => ({
@@ -26,8 +72,9 @@ const QuizGame: React.FC<QuizGameProps> = ({ questions, settings, onFinish, isDa
         isCorrect: answers[idx] === q.correctAnswerIndex,
         timeTaken: timeTakenPerQuestion[idx]
      }));
+     clearQuizStorage();
      onFinish(finalResults);
-  }, [answers, onFinish, questions, timeTakenPerQuestion]);
+  }, [answers, onFinish, questions, timeTakenPerQuestion, clearQuizStorage]);
 
   const handleNext = useCallback(() => {
     if (settings.totalTimeLimit > 0 && (totalTimeElapsed / 60) >= settings.totalTimeLimit) {
@@ -123,8 +170,8 @@ const QuizGame: React.FC<QuizGameProps> = ({ questions, settings, onFinish, isDa
       </div>
 
       {/* Play Area */}
-      <div className="flex-1 overflow-y-auto px-6 pb-20 md:px-10 custom-scrollbar">
-        <div key={currentIndex} className={`max-w-4xl mx-auto glass rounded-[3rem] shadow-2xl p-8 md:p-14 border animate-slide-up quiz-card ${isDarkMode ? 'bg-slate-900/40 border-slate-800 shadow-slate-950/50' : 'bg-white/70 border-white shadow-slate-200/50'}`}>
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-6 pb-24 md:px-10 custom-scrollbar">
+        <div ref={cardRef} key={currentIndex} className={`max-w-4xl mx-auto glass rounded-[3rem] shadow-2xl p-8 md:p-14 border animate-slide-up quiz-card ${isDarkMode ? 'bg-slate-900/40 border-slate-800 shadow-slate-950/50' : 'bg-white/70 border-white shadow-slate-200/50'}`}>
             <h2 className={`text-2xl md:text-4xl font-extrabold mb-10 leading-snug tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
             {currentQuestion.text}
             </h2>

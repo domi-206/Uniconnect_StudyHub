@@ -85,7 +85,7 @@ export const speakText = async (text: string, accent: VoiceAccent): Promise<stri
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const cleanText = text.replace(/[#*]/g, '').trim();
   
-  // Basic heuristic for general TTS call
+  // Default general voices
   const voiceName = accent === 'NG' ? 'Kore' : (accent === 'UK' ? 'Puck' : 'Zephyr');
 
   const response = await ai.models.generateContent({
@@ -113,7 +113,7 @@ export const generatePodcastContent = async (file: UploadedFile, settings: Podca
     ? `Write this as a conversation between two hosts. Host A is named ${hostAName}, Host B is named ${hostBName}. Use '${hostAName}:' and '${hostBName}:' prefixes.` 
     : `Write this as a solo presentation by ${hostAName}. Use '${hostAName}:' prefix.`;
 
-  // Use JSON schema to get structured segments for the transcript
+  // Explicit instruction for gender detection and voice assignment
   const scriptResponse = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: [
@@ -123,16 +123,21 @@ export const generatePodcastContent = async (file: UploadedFile, settings: Podca
                ${speakerInstruction}
                ${topicContext}
                
-               IMPORTANT: Determine the gender of the host names provided. 
-               Choose appropriate voices:
-               For Female: 'Kore' or 'Zephyr'.
-               For Male: 'Puck', 'Fenrir', or 'Charon'.
+               IMPORTANT VOICE ASSIGNMENT:
+               1. Analyze host names: Host A (${hostAName}), Host B (${hostBName}).
+               2. Inferred gender:
+                  - If Female name: Must assign 'Zephyr' or 'Kore' or 'Puck'.
+                  - If Male name: Must assign 'Fenrir' or 'Charon'.
+               3. Pick best voice matching gender and accent ${accent}:
+                  - US: Female='Zephyr', Male='Fenrir'
+                  - UK: Female='Puck', Male='Charon'
+                  - NG: Female='Kore', Male='Fenrir'
                
                Return a JSON object with:
-               'voiceHostA': the selected voice name for ${hostAName},
-               'voiceHostB': the selected voice name for ${hostBName} (if double),
-               'segments': array of objects with {startTime (seconds), topic, speaker, text}.
-               Estimated total duration should be ${durationMinutes} minutes.` }
+               'voiceHostA': name of the assigned voice for ${hostAName},
+               'voiceHostB': name of the assigned voice for ${hostBName} (if double),
+               'segments': array of objects with {startTime, topic, speaker, text}.
+               Target duration: ${durationMinutes} minutes.` }
     ],
     config: {
       responseMimeType: "application/json",
@@ -165,7 +170,6 @@ export const generatePodcastContent = async (file: UploadedFile, settings: Podca
   const voiceA = parsed.voiceHostA || (accent === 'UK' ? 'Puck' : 'Zephyr');
   const voiceB = parsed.voiceHostB || (accent === 'UK' ? 'Charon' : 'Kore');
   
-  // Create raw text for TTS
   const fullText = segments.map(s => `${s.speaker}: ${s.text}`).join('\n\n');
 
   const ttsConfig: any = {

@@ -165,7 +165,7 @@ const App: React.FC = () => {
       ],
       UK: [
         { q: "Success is not final, failure is not fatal: it is the courage to continue that counts.", a: "Winston Churchill" },
-        { q: "The only limit to our realization of tomorrow will be our doubts of today.", a: "Franklin D. Roosevelt (UK Influence)" },
+        { q: "The only limit to our realization of tomorrow will be our doubts of today.", a: "Franklin D. Roosevelt" },
         { q: "Discipline is the bridge between goals and accomplishment.", a: "Jim Rohn" },
         { q: "Where there is a will, there is a way.", a: "Old English Proverb" }
       ],
@@ -253,49 +253,52 @@ const App: React.FC = () => {
   return (
     <div className={`h-screen w-full relative overflow-hidden font-sans select-none transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-white dark' : 'bg-slate-50 text-slate-900'}`}>
         {isLoading && (
-            <div className={`absolute inset-0 z-[100] backdrop-blur-3xl flex flex-col items-center justify-center animate-fade p-6 text-center ${isDarkMode ? 'bg-slate-950/90' : 'bg-white/95'}`}>
-                <div className="relative w-48 h-48 md:w-56 md:h-56 flex items-center justify-center mb-8">
-                    <svg className="w-full h-full transform -rotate-90">
-                        <circle cx="50%" cy="50%" r="90" stroke={isDarkMode ? "#1e293b" : "#f1f5f9"} strokeWidth="12" fill="transparent" />
-                        <circle cx="50%" cy="50%" r="90" stroke="#07bc0c" strokeWidth="12" strokeDasharray="565" strokeDashoffset={565 - (565 * loadingProgress) / 100} strokeLinecap="round" fill="transparent" className="transition-all duration-500 ease-out" />
-                    </svg>
-                    <div className="absolute flex flex-col items-center justify-center">
-                        <Brain className="w-12 h-12 text-[#07bc0c] animate-pulse mb-1" />
-                        <span className="text-3xl font-black">{Math.round(loadingProgress)}%</span>
+            <div className={`absolute inset-0 z-[100] backdrop-blur-3xl flex flex-col items-center justify-center animate-fade p-4 md:p-8 text-center overflow-y-auto ${isDarkMode ? 'bg-slate-950/90' : 'bg-white/95'}`}>
+                <div className="max-w-2xl w-full flex flex-col items-center my-auto min-h-0 flex-shrink">
+                    <div className="relative w-32 h-32 md:w-56 md:h-56 flex items-center justify-center mb-6 shrink-0">
+                        <svg className="w-full h-full transform -rotate-90">
+                            <circle cx="50%" cy="50%" r="60" md:r="90" stroke={isDarkMode ? "#1e293b" : "#f1f5f9"} strokeWidth="10" fill="transparent" />
+                            <circle cx="50%" cy="50%" r="60" md:r="90" stroke="#07bc0c" strokeWidth="10" strokeDasharray="565" strokeDashoffset={565 - (565 * loadingProgress) / 100} strokeLinecap="round" fill="transparent" className="transition-all duration-500 ease-out" />
+                        </svg>
+                        <div className="absolute flex flex-col items-center justify-center">
+                            <Brain className="w-8 h-8 md:w-12 md:h-12 text-[#07bc0c] animate-pulse mb-1" />
+                            <span className="text-xl md:text-3xl font-black">{Math.round(loadingProgress)}%</span>
+                        </div>
                     </div>
+                    
+                    <h3 className="text-xl md:text-4xl font-black mb-2 tracking-tight shrink-0">{loadingText || 'StudyHub Processing'}</h3>
+                    <p className={`font-bold text-sm md:text-lg mb-4 shrink-0 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{loadingStage}</p>
+                    
+                    {loadingType === 'podcast' && (
+                      <div className={`w-full p-6 md:p-10 rounded-[2rem] border animate-slide-up shadow-2xl transition-all overflow-y-auto max-h-[60vh] custom-scrollbar ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                        <div className="flex flex-col items-center gap-3 md:gap-5 text-center">
+                          <div className="flex items-center gap-2 text-amber-500 mb-1 shrink-0">
+                            <AlertCircle className="w-4 h-4 md:w-5 md:h-5" />
+                            <span className="text-[10px] md:text-xs font-black uppercase tracking-[0.2em]">Studio Status</span>
+                          </div>
+                          <p className={`text-xs md:text-sm font-bold leading-relaxed shrink-0 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                            Our AI hosts are preparing your study podcast. This process is working perfectly. 
+                            Please note that loading time varies based on the number of minutes you selected.
+                          </p>
+                          
+                          <div className={`h-px w-full my-3 md:my-5 shrink-0 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'}`}></div>
+                          
+                          <div className="flex flex-col items-center">
+                            <Quote className="w-6 h-6 md:w-8 md:h-8 text-[#07bc0c] opacity-20 mb-3 md:mb-5 shrink-0" />
+                            {(() => {
+                               const q = getLoadingQuote();
+                               return (
+                                 <>
+                                   <p className={`text-sm md:text-xl font-extrabold italic leading-snug mb-2 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>"{q.q}"</p>
+                                   <p className="text-[10px] font-black uppercase tracking-widest text-[#07bc0c]">— {q.a}</p>
+                                 </>
+                               );
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                 </div>
-                <h3 className="text-3xl md:text-4xl font-black mb-3 tracking-tight">{loadingText || 'StudyHub Processing'}</h3>
-                <p className={`font-bold text-lg mb-8 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{loadingStage}</p>
-                
-                {loadingType === 'podcast' && (
-                  <div className={`max-w-xl p-8 rounded-[2rem] border animate-slide-up ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                    <div className="flex flex-col items-center gap-4 text-center">
-                      <div className="flex items-center gap-2 text-amber-500 mb-2">
-                        <AlertCircle className="w-5 h-5" />
-                        <span className="text-xs font-black uppercase tracking-widest">Studio Status</span>
-                      </div>
-                      <p className={`text-sm font-bold leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                        Our AI hosts are preparing your study podcast. This process is working perfectly. 
-                        Please note that loading time varies based on the number of minutes you selected.
-                      </p>
-                      
-                      <div className={`h-px w-full my-4 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'}`}></div>
-                      
-                      <div className="flex flex-col items-center">
-                        <Quote className="w-8 h-8 text-[#07bc0c] opacity-20 mb-4" />
-                        {(() => {
-                           const q = getLoadingQuote();
-                           return (
-                             <>
-                               <p className={`text-lg font-extrabold italic leading-snug mb-2 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>"{q.q}"</p>
-                               <p className="text-[10px] font-black uppercase tracking-widest text-[#07bc0c]">— {q.a}</p>
-                             </>
-                           );
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                )}
             </div>
         )}
 
@@ -303,7 +306,7 @@ const App: React.FC = () => {
         {mode === AppMode.DASHBOARD && <Dashboard />}
         {mode === AppMode.CHAT && file && <ChatInterface file={file} isDarkMode={isDarkMode} onOpenQuiz={() => setMode(AppMode.QUIZ_CONFIG)} onReset={() => setMode(AppMode.DASHBOARD)} onToggleTheme={() => setIsDarkMode(!isDarkMode)} />}
         {mode === AppMode.QUIZ_CONFIG && <QuizConfig topics={topics} onStart={handleStartQuizGen} onBack={() => setMode(AppMode.DASHBOARD)} isDarkMode={isDarkMode} />}
-        {mode === AppMode.QUIZ_PLAY && quizSettings && <QuizGame questions={currentQuestions} settings={quizSettings} onFinish={(r) => { setQuizResults(r); setMode(AppMode.QUIZ_REVIEW); }} isDarkMode={isDarkMode} />}
+        {mode === AppMode.QUIZ_PLAY && quizSettings && <QuizGame questions={currentQuestions} settings={quizSettings} onFinish={(r) => { setQuizResults(r); setMode(AppMode.QUIZ_REVIEW); }} isDarkMode={isDarkMode} topic={currentQuizTopic} />}
         {mode === AppMode.QUIZ_REVIEW && file && <QuizReview questions={currentQuestions} results={quizResults} topic={currentQuizTopic} file={file} onRetry={() => setMode(AppMode.QUIZ_CONFIG)} onExit={() => setMode(AppMode.DASHBOARD)} onUnlockNext={() => {}} isDarkMode={isDarkMode} />}
         {mode === AppMode.PODCAST_CONFIG && <PodcastConfig topics={topics} onStart={handleStartPodcastGen} onBack={() => setMode(AppMode.DASHBOARD)} isDarkMode={isDarkMode} />}
         {mode === AppMode.PODCAST_PLAY && podcastAudio && <PodcastPlayer audioBase64={podcastAudio} segments={podcastSegments} isDarkMode={isDarkMode} onClose={() => setMode(AppMode.DASHBOARD)} />}

@@ -190,7 +190,9 @@ const PodcastConfig: React.FC<PodcastConfigProps> = ({ topics, onStart, onBack, 
             {accents.map(a => (
               <button 
                 key={a.id} 
-                onClick={() => setSettings({ ...settings, accent: a.id })}
+                onClick={() => {
+                  setSettings({ ...settings, accent: a.id });
+                }}
                 className={`p-6 rounded-[1.5rem] border-2 flex items-center justify-center gap-3 transition-all ${
                   settings.accent === a.id 
                   ? 'border-[#07bc0c] bg-[#07bc0c]/5 shadow-xl' 
@@ -214,11 +216,15 @@ const PodcastConfig: React.FC<PodcastConfigProps> = ({ topics, onStart, onBack, 
               <span className="text-lg font-black">{settings.durationMinutes} Minutes</span>
             </div>
             <input 
-              type="range" min="3" max="20" step="1" 
+              type="range" min="3" max="10" step="1" 
               value={settings.durationMinutes}
               onChange={(e) => setSettings({ ...settings, durationMinutes: parseInt(e.target.value) })}
               className="w-full h-2 bg-[#07bc0c]/20 rounded-lg appearance-none cursor-pointer accent-[#07bc0c]"
             />
+            <div className="flex justify-between text-[10px] font-black opacity-30 mt-2 px-1">
+              <span>3 MIN</span>
+              <span>10 MIN</span>
+            </div>
           </div>
         </section>
       </div>

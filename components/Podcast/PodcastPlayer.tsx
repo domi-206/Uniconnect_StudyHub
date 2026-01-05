@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Headphones, Play, Pause, Download, X, Volume2, SkipBack, SkipForward, FastForward, Timer } from 'lucide-react';
+import { Headphones, Play, Pause, Download, X, Volume2, SkipBack, SkipForward, FastForward, Timer, ChevronLeft } from 'lucide-react';
 import { PodcastSegment } from '../../types';
 
 interface PodcastPlayerProps {
@@ -11,7 +11,7 @@ interface PodcastPlayerProps {
 }
 
 const PodcastPlayer: React.FC<PodcastPlayerProps> = ({ audioBase64, segments, isDarkMode, onClose }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false); // strictly paused by default
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -37,7 +37,6 @@ const PodcastPlayer: React.FC<PodcastPlayerProps> = ({ audioBase64, segments, is
       setCurrentTime(audio.currentTime);
       setProgress((audio.currentTime / audio.duration) * 100);
       
-      // Update active segment
       const idx = segments.findIndex((s, i) => {
         const nextStart = segments[i + 1]?.startTime ?? Infinity;
         return audio.currentTime >= s.startTime && audio.currentTime < nextStart;
@@ -78,9 +77,20 @@ const PodcastPlayer: React.FC<PodcastPlayerProps> = ({ audioBase64, segments, is
   };
 
   const togglePlay = () => {
-    if (isPlaying) audioRef.current?.pause();
-    else audioRef.current?.play();
-    setIsPlaying(!isPlaying);
+    if (isPlaying) {
+      audioRef.current?.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current?.play();
+      setIsPlaying(true);
+    }
+  };
+
+  const handleClose = () => {
+    if (audioRef.current) {
+        audioRef.current.pause(); // Automatically pause when clicking back/listing
+    }
+    onClose();
   };
 
   const formatTime = (s: number) => {
@@ -94,10 +104,8 @@ const PodcastPlayer: React.FC<PodcastPlayerProps> = ({ audioBase64, segments, is
       const targetTime = Math.max(0, Math.min(time, duration));
       audioRef.current.currentTime = targetTime;
       setCurrentTime(targetTime);
-      if (!isPlaying) {
-        audioRef.current.play();
-        setIsPlaying(true);
-      }
+      // Removed the check that forced play() on seek.
+      // Audio will only play if togglePlay is clicked.
     }
   };
 
@@ -109,32 +117,32 @@ const PodcastPlayer: React.FC<PodcastPlayerProps> = ({ audioBase64, segments, is
 
   return (
     <div className={`fixed inset-0 z-[300] flex items-center justify-center p-3 md:p-6 lg:p-10 animate-fade`}>
-      <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-3xl" onClick={onClose}></div>
+      <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-3xl" onClick={handleClose}></div>
       
       <div className={`relative w-full max-w-7xl h-full max-h-[92vh] md:max-h-[90vh] rounded-[2rem] md:rounded-[3.5rem] shadow-2xl overflow-hidden border flex flex-col md:flex-row transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-white'}`}>
         
         {/* Left Side: Controls & Visuals */}
-        <div className="md:w-2/5 lg:w-1/3 p-6 md:p-10 border-b md:border-b-0 md:border-r border-slate-800 flex flex-col items-center justify-center bg-gradient-to-b from-transparent to-black/10 shrink-0 overflow-y-auto custom-scrollbar">
-          <button onClick={onClose} className="absolute top-4 left-4 md:top-6 md:left-6 p-2 rounded-xl hover:bg-red-500/10 hover:text-red-500 transition-all z-50">
-            <X className="w-5 h-5 md:w-6 md:h-6" />
+        <div className="md:w-[45%] lg:w-[35%] p-6 md:p-10 border-b md:border-b-0 md:border-r border-slate-800 flex flex-col items-center justify-center bg-gradient-to-b from-transparent to-black/10 shrink-0 overflow-y-auto custom-scrollbar min-h-0">
+          <button onClick={handleClose} className="absolute top-4 left-4 md:top-6 md:left-6 p-2 rounded-xl hover:bg-red-500/10 hover:text-red-500 transition-all z-50 flex items-center gap-2 font-black text-xs uppercase tracking-widest">
+            <ChevronLeft className="w-5 h-5 md:w-6 md:h-6" /> Back to Listing
           </button>
 
-          <div className="relative mb-6 md:mb-12 mt-4 md:mt-0">
-            <div className="w-32 h-32 md:w-44 lg:w-56 bg-[#07bc0c] rounded-[2.5rem] md:rounded-[3.5rem] flex items-center justify-center shadow-[0_0_60px_#07bc0c]/30 animate-float">
+          <div className="relative mb-6 md:mb-12 mt-8 md:mt-0 flex-shrink-0">
+            <div className="w-32 h-32 md:w-44 lg:w-52 bg-[#07bc0c] rounded-[2.5rem] md:rounded-[3.5rem] flex items-center justify-center shadow-[0_0_60px_#07bc0c]/30 animate-float">
                 <Headphones className="w-16 h-16 md:w-24 lg:w-32 text-white" />
             </div>
-            <div className="absolute -bottom-2 -right-2 md:-bottom-4 md:-right-4 w-12 h-12 md:w-16 md:h-20 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center shadow-lg border-2 md:border-4 border-slate-900">
+            <div className="absolute -bottom-2 -right-2 md:-bottom-4 md:-right-4 w-12 h-12 md:w-16 md:h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center shadow-lg border-2 md:border-4 border-slate-900">
                 <Volume2 className="w-5 h-5 md:w-8 md:h-8 text-[#07bc0c]" />
             </div>
           </div>
 
-          <div className="text-center mb-6 md:mb-10 w-full">
+          <div className="text-center mb-6 md:mb-10 w-full flex-shrink-0">
             <h2 className={`text-2xl md:text-3xl lg:text-4xl font-black mb-2 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Study Podcast</h2>
             <p className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-[#07bc0c] mb-2">Unispace Audio Production</p>
             <p className={`text-[10px] md:text-xs opacity-50 font-bold max-w-xs mx-auto leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>High-fidelity study summary, synthesized with absolute precision.</p>
           </div>
 
-          <div className="w-full space-y-4 md:space-y-8 mb-6 md:mb-10 px-2">
+          <div className="w-full space-y-4 md:space-y-8 mb-6 md:mb-10 px-2 flex-shrink-0">
             <div className="flex justify-between text-[10px] md:text-xs font-black opacity-60 uppercase tracking-widest px-1">
               <span>{formatTime(currentTime)}</span>
               <span>{formatTime(duration)}</span>
@@ -148,7 +156,7 @@ const PodcastPlayer: React.FC<PodcastPlayerProps> = ({ audioBase64, segments, is
             </div>
           </div>
 
-          <div className="flex items-center gap-4 md:gap-8 mb-6 md:mb-12">
+          <div className="flex items-center gap-4 md:gap-8 mb-6 md:mb-12 flex-shrink-0">
             <button onClick={() => handleSeek(currentTime - 10)} className={`p-2.5 md:p-4 rounded-2xl border transition-all hover:scale-110 active:scale-90 ${isDarkMode ? 'border-slate-800 text-slate-500 hover:text-white' : 'border-slate-200 text-slate-400 hover:text-slate-900'}`} title="Back 10s">
               <SkipBack className="w-6 h-6 md:w-8 md:h-8" />
             </button>
@@ -160,7 +168,7 @@ const PodcastPlayer: React.FC<PodcastPlayerProps> = ({ audioBase64, segments, is
             </button>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full justify-center px-4">
+          <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full justify-center px-4 flex-shrink-0">
              <button onClick={cycleSpeed} className={`flex-1 flex items-center justify-center gap-2 px-5 py-3 md:py-4 rounded-2xl border text-[10px] md:text-xs font-black uppercase tracking-widest transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white hover:bg-[#07bc0c]/10 hover:border-[#07bc0c]' : 'bg-white border-slate-200 text-slate-800 hover:bg-[#07bc0c]/5 hover:border-[#07bc0c]'}`}>
                 <FastForward className="w-4 h-4 text-[#07bc0c]" /> {playbackSpeed}x Speed
              </button>
@@ -228,7 +236,7 @@ const PodcastPlayer: React.FC<PodcastPlayerProps> = ({ audioBase64, segments, is
                         </div>
                     );
                 })}
-                <div className="h-20 shrink-0"></div> {/* Spacer for scroll center */}
+                <div className="h-20 shrink-0"></div>
             </div>
         </div>
       </div>
